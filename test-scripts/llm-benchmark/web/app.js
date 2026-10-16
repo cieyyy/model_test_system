@@ -164,8 +164,9 @@
     const ceiling = Math.max(100,Math.ceil(max/4/100)*100*4);
     const x = i => left + (rows.length>1 ? i/(rows.length-1)*width : width/2);
     const y = value => top + height - value/ceiling*height;
-    ctx.font = '11px -apple-system, sans-serif'; ctx.fillStyle='#798797'; ctx.textAlign='right';
-    for(let i=0;i<=4;i++) {const value=ceiling*i/4, yy=y(value);ctx.setLineDash([4,4]);ctx.strokeStyle='#dce2e9';ctx.beginPath();ctx.moveTo(left,yy);ctx.lineTo(left+width,yy);ctx.stroke();ctx.fillText(number(value,0)+'ms',left-8,yy+4);}
+    const chartStyle=getComputedStyle(document.documentElement);
+    ctx.font = '11px -apple-system, sans-serif'; ctx.fillStyle=chartStyle.getPropertyValue('--chart-label').trim()||'#798797'; ctx.textAlign='right';
+    for(let i=0;i<=4;i++) {const value=ceiling*i/4, yy=y(value);ctx.setLineDash([4,4]);ctx.strokeStyle=chartStyle.getPropertyValue('--chart-grid').trim()||'#dce2e9';ctx.beginPath();ctx.moveTo(left,yy);ctx.lineTo(left+width,yy);ctx.stroke();ctx.fillText(number(value,0)+'ms',left-8,yy+4);}
     ctx.setLineDash([]); ctx.textAlign='center';
     const ticks = Math.min(7,rows.length);
     for(let i=0;i<ticks;i++) {const index=ticks===1 ? 0 : Math.round(i/(ticks-1)*(rows.length-1));ctx.fillText(String(rows[index].sequence),x(index),top+height+20);}
@@ -227,7 +228,15 @@
       heightFrame = requestAnimationFrame(() => window.parent.postMessage({type:'benchmark:resize',height:Math.ceil(document.body.getBoundingClientRect().height)}, '*'));
     };
     window.addEventListener('message', event => {
-      if(event.source !== window.parent || event.data?.type !== 'benchmark:update') return;
+      if(event.source !== window.parent) return;
+      if(event.data?.type === 'benchmark:theme' && ['light','dark'].includes(event.data.theme)) {
+        document.documentElement.dataset.theme=event.data.theme;
+        const colors=event.data.theme==='dark'?['#9ac9ad','#a6bdf0','#e3c779']:['#23634a','#4465a3','#a16a29'];
+        series.forEach((item,index)=>{item[1]=colors[index];document.querySelector(`[data-series="${item[0]}"]`).closest('label').style.setProperty('--series',colors[index]);});
+        drawChart();
+        return;
+      }
+      if(event.data?.type !== 'benchmark:update') return;
       const report = event.data.report;
       if(!report?.config || !report.summary || !Array.isArray(report.requests)) return;
       render(report);

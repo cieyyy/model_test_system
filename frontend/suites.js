@@ -18,13 +18,13 @@ async function renderSuites() {
   clearTimeout(suitePoll);
   suiteGeneration++;
   suitePlan=null;
-  $('#main').innerHTML='<h2>测试套件</h2><div class="suite-status">正在读取套件目录…</div>';
+  $('#main').innerHTML=studioHeading('suites')+'<div class="suite-status">正在读取套件目录…</div>';
   try {
     suiteCatalog=await api('/suites');
     suiteEditing=null;
     suiteSelected=new Set(suiteCatalog.suites.map(s=>s.id));
     if(state.tab!=='suites') return;
-    $('#main').innerHTML=`<div class="suite-toolbar"><h2>测试配置</h2><button class="btn" onclick="suiteAll()">一键测试全部项目</button></div>
+    $('#main').innerHTML=`${studioHeading('suites')}<div class="suite-toolbar"><h2>测试配置</h2><button class="btn" onclick="suiteAll()">一键测试全部项目</button></div>
       <form id="suiteForm" onsubmit="event.preventDefault();suitePreview()">
         <div class="suite-form">
           <div class="field"><label for="sqScope">执行范围</label><select id="sqScope" onchange="suiteScopeChanged()"><option value="single">单个项目</option><option value="all">所有项目</option></select></div>
@@ -208,7 +208,7 @@ async function suiteCancel(id) { try {await suitePost('/jobs/'+id+'/cancel');toa
 async function renderSuiteReports() {
   clearTimeout(suitePoll);
   suiteGeneration++;
-  $('#main').innerHTML='<h2>测试报告</h2><div id="suiteError" class="suite-error"></div><div id="editableReportList"></div><div id="suiteReportList"></div><section id="reportEditor"></section><section id="suiteReport"></section>';
+  $('#main').innerHTML=studioHeading('reports')+'<div id="suiteError" class="suite-error"></div><div id="editableReportList"></div><div id="suiteReportList"></div><section id="reportEditor"></section><section id="suiteReport"></section>';
   try {
     const [runs,legacy]=await Promise.all([api('/suites/runs'),api('/suites/legacy-reports')]);
     if(state.tab!=='reports') return;

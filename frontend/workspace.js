@@ -14,6 +14,7 @@ window.addEventListener('message', event => {
     if (Math.abs(parseFloat(frame.style.height || '0') - height) > 2) frame.style.height = height + 'px';
   }
   if (data?.type === 'benchmark:ready') {
+    studioSendTheme(frame);
     frame.dataset.ready = 'true';
     const report = benchmarkFrames.get(frame);
     if (report) frame.contentWindow.postMessage({type:'benchmark:update', report}, '*');
@@ -63,7 +64,7 @@ async function renderDashboard() {
   clearTimeout(suitePoll);
   suiteGeneration++;
   const generation = ++workspaceGeneration;
-  $('#main').innerHTML = `<div class="workspace-toolbar"><div class="field"><label for="workspaceStage">测试记录 / 阶段</label><select id="workspaceStage" onchange="workspaceOpenRun(Number(this.value))"></select></div><div class="workspace-toolbar-actions"><button class="btn" id="workspaceCancel" hidden>取消测试</button><button class="btn" id="workspaceEvidence" hidden>运行证据</button><button class="btn primary" onclick="go('suites')">新建测试</button></div></div><div id="suiteError" role="alert" class="suite-error"></div><div id="workspaceReport"></div>`;
+  $('#main').innerHTML = `${studioHeading('dashboard')}<div class="workspace-toolbar"><div class="field"><label for="workspaceStage">测试记录 / 阶段</label><select id="workspaceStage" onchange="workspaceOpenRun(Number(this.value))"></select></div><div class="workspace-toolbar-actions"><button class="btn" id="workspaceCancel" hidden>取消测试</button><button class="btn" id="workspaceEvidence" hidden>运行证据</button><button class="btn primary" onclick="go('suites')">新建测试</button></div></div><div id="suiteError" role="alert" class="suite-error"></div><div id="workspaceReport"></div>`;
   const runs = await refreshWorkspaceHistory();
   if (state.tab !== 'dashboard' || generation !== workspaceGeneration) return;
   if (!runs.length) {

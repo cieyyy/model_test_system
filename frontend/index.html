@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>模型测试平台 · 套件与压测报告</title>
+<script>try{document.documentElement.dataset.theme=localStorage.getItem('platformTheme')==='light'?'light':'dark';}catch{document.documentElement.dataset.theme='dark';}</script>
 <link rel="stylesheet" href="/static/suites.css">
 <style>
   :root {
@@ -91,21 +92,22 @@
   }
 </style>
 <link rel="stylesheet" href="/static/workspace.css">
+<link rel="stylesheet" href="/static/studio.css?v=20261016">
 </head>
 <body>
 <aside id="platformSidebar">
-  <a class="workspace-brand" href="#dashboard" onclick="event.preventDefault();go('dashboard')"><span class="workspace-mark">M</span> 模型测试</a>
-  <button id="workspaceNew" class="btn primary" onclick="workspaceNewTest()">新建测试</button>
+  <a class="workspace-brand" href="#dashboard" onclick="event.preventDefault();go('dashboard')"><span class="workspace-mark"><i data-lucide="aperture" aria-hidden="true"></i></span><span>模型测试<small>MODEL TESTING</small></span></a>
+  <button id="workspaceNew" class="btn primary" onclick="workspaceNewTest()"><i data-lucide="plus" aria-hidden="true"></i>新建测试</button>
   <nav id="nav" aria-label="工作区导航"></nav>
   <div class="workspace-history-heading">测试记录 <span id="workspaceHistoryCount">0</span></div>
   <div id="workspaceHistory" aria-label="测试记录"></div>
-  <div class="workspace-sidebar-footer">本地工作空间</div>
+  <div class="workspace-sidebar-footer"><i data-lucide="layers-2" aria-hidden="true"></i> 测试工作空间 <span>01</span></div>
 </aside>
 <div id="platformWorkspace">
 <header>
-  <h1>模型测试平台</h1>
+  <div class="studio-breadcrumb"><span>工作空间</span><i data-lucide="chevron-right" aria-hidden="true"></i><h1 id="workspaceLocation">压测工作台</h1></div>
   <span class="phase">测试套件 · 压测报告</span>
-  <span class="pw-state" id="pwState"></span>
+  <div class="studio-header-actions"><span class="pw-state" id="pwState"></span><button class="studio-icon-button" id="themeToggle" type="button" onclick="studioToggleTheme()" title="切换到浅色" aria-label="切换到浅色"><i data-lucide="sun" aria-hidden="true"></i></button><button class="studio-icon-button" type="button" onclick="go('settings')" title="设置" aria-label="设置"><i data-lucide="settings-2" aria-hidden="true"></i></button></div>
 </header>
 <main id="main"></main>
 </div>
@@ -113,6 +115,8 @@
 <div class="modal-mask" id="mask"><div class="modal" id="modalBox"></div></div>
 <div class="toast" id="toast"></div>
 
+<script src="/static/vendor/lucide.min.js"></script>
+<script src="/static/studio.js?v=20261016"></script>
 <script src="/static/suites.js"></script>
 <script src="/static/reports.js"></script>
 <script src="/static/workspace.js"></script>
@@ -145,9 +149,11 @@ const TABS = [
 
 function renderNav() {
   const primary = ['dashboard', 'suites', 'reports'];
-  const button = ([k, label]) => `<button class="${state.tab === k ? "active" : ""}" onclick="go('${k}')">${label}</button>`;
+  const icons={dashboard:'activity',overview:'layout-dashboard',providers:'network',models:'boxes',projects:'list-checks',exec:'terminal',suites:'flask-conical',reports:'chart-no-axes-combined',matrix:'grid-2x2',import:'folder-input',settings:'settings-2'};
+  const button = ([k, label]) => `<button class="${state.tab === k ? "active" : ""}" onclick="go('${k}')" ${state.tab===k?'aria-current="page"':''}><i data-lucide="${icons[k]}" aria-hidden="true"></i><span>${label}</span></button>`;
   $("#nav").innerHTML = TABS.filter(([k]) => primary.includes(k)).map(button).join('') +
     `<details ${primary.includes(state.tab) ? '' : 'open'}><summary>管理</summary>${TABS.filter(([k]) => !primary.includes(k)).map(button).join('')}</details>`;
+  $('#workspaceLocation').textContent=TABS.find(([k])=>k===state.tab)?.[1]||'压测工作台';
 }
 function go(tab) { clearTimeout(workspacePoll); clearTimeout(suitePoll); state.tab = tab; history.replaceState(null, '', '#'+tab); renderNav(); render(); }
 window.go = go;

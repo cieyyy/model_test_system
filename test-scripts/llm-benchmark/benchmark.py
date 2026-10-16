@@ -219,6 +219,7 @@ def report_html(report, embedded=False):
     css = (HERE / "web" / "style.css").read_text(encoding="utf-8")
     data = json.dumps(report, ensure_ascii=False).replace("<", "\\u003c").replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
     if embedded:
+        css += "\n" + (HERE / "web" / "embedded-theme.css").read_text(encoding="utf-8")
         css += "\nhtml,body{min-height:0!important;height:auto!important}body{display:block!important}.offline main{padding:0;max-width:none}.offline #report{width:100%}@media(min-width:980px){.analysis-grid{grid-template-columns:minmax(0,.88fr) minmax(0,1.2fr)}}"
     return template.replace('<link rel="stylesheet" href="/style.css">', f"<style>{css}</style>").replace(
         '<script src="/app.js" defer></script>', f"<script>window.BENCHMARK_EMBED={str(embedded).lower()};window.BENCHMARK_DATA={data};document.addEventListener('DOMContentLoaded',function(){{\n{js}\n}});</script>")
