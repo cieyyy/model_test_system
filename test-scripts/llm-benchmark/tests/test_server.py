@@ -62,6 +62,7 @@ class ServerTests(unittest.TestCase):
     def test_origin_validation_missing_key_and_invalid_input(self):
         cross = self.client.post('/api/runs', json=dict(config=dict(demo=True)), headers={'Origin':'http://untrusted.example'})
         self.assertEqual(cross.status_code, 403)
+        self.assertEqual(cross.headers.get('connection'), 'close')
         config = dict(endpoint='https://example.com/v1/chat/completions', model='m', api_key_env='BENCHMARK_TEST_UNSET')
         self.assertEqual(self.client.post('/api/runs', json={'config':config}).status_code, 400)
         self.assertEqual(self.client.post('/api/runs', json={'config':dict(demo=True), 'api_key':123}).status_code, 400)
