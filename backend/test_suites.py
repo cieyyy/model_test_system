@@ -109,6 +109,19 @@ class SuiteTests(unittest.TestCase):
             time.sleep(.03)
         self.fail("Job did not terminate")
 
+    def test_result_writer_commits_while_report_reader_holds_snapshot(self):
+        from app.db import engine
+        with engine.connect() as reader:
+            self.assertEqual(reader.exec_driver_sql("PRAGMA journal_mode").scalar(), "wal")
+            reader.exec_driver_sql("BEGIN")
+            before = reader.exec_driver_sql("SELECT count(*) FROM providers").scalar()
+            with SessionLocal() as writer:
+                writer.add(Provider(name="offline-concurrent-report-reader"))
+                writer.commit()
+            self.assertEqual(reader.exec_driver_sql("SELECT count(*) FROM providers").scalar(), before)
+            reader.rollback()
+            self.assertEqual(reader.exec_driver_sql("SELECT count(*) FROM providers").scalar(), before + 1)
+
     def test_source_assertions_and_missing_metrics(self):
         from app.report_results import detail, overview, observed
         passed = detail(dict(case="tools", result="pass", http_status="200", ttft_ms="0", input_tokens="0"), "工具", "results.csv", 1)

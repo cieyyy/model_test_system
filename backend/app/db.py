@@ -24,7 +24,7 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 DB_PATH = DATA_DIR / "app.db"
 
-engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
+engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False, "timeout": 30})
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 
@@ -215,6 +215,9 @@ def init_db() -> None:
 
     from sqlalchemy import text
 
+    # Report readers and background result writers must be able to overlap.
+    with engine.connect() as conn:
+        conn.exec_driver_sql("PRAGMA journal_mode=WAL")
     Base.metadata.create_all(engine)
     # 轻量迁移：为旧库补充后续新增的列（SQLite 的 create_all 不会更新已有表）
     with engine.begin() as conn:
