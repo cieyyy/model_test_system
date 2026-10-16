@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>模型测试平台 · 套件与压测报告</title>
+<link rel="stylesheet" href="/static/suites.css">
+<style>
+  :root {
+    --bg: #f5f5f2; --surface: #ffffff; --border: #e2e0d8; --border-strong: #c8c6bd;
+    --text: #2c2c2a; --text-2: #5f5e5a; --text-3: #888780;
+    --accent: #534ab7; --accent-bg: #eeedfe; --accent-border: #a0f;
+    --ok: #0f6e56; --ok-bg: #e1f5ee; --warn: #854f0b; --warn-bg: #faeeda;
+    --danger: #a32d2d; --danger-bg: #fcebeb; --blue: #185fa5; --blue-bg: #e6f1fb;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.6; }
+  header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 14px 28px; display: flex; align-items: center; gap: 16px; position: sticky; top: 0; z-index: 10; }
+  header h1 { font-size: 16px; font-weight: 600; }
+  header .phase { font-size: 12px; color: var(--accent); background: var(--accent-bg); padding: 2px 10px; border-radius: 99px; }
+  header .pw-state { margin-left: auto; font-size: 12px; }
+  header .pw-state .ok { color: var(--ok); } header .pw-state .no { color: var(--warn); }
+  nav { display: flex; gap: 4px; padding: 10px 28px 0; background: var(--surface); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  nav button { border: none; background: none; padding: 8px 16px 10px; font-size: 14px; color: var(--text-2); cursor: pointer; border-bottom: 2px solid transparent; }
+  nav button.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 500; }
+  main { max-width: 1080px; margin: 0 auto; padding: 24px 28px 60px; }
+  h2 { font-size: 15px; font-weight: 600; margin: 8px 0 14px; }
+  .hint { color: var(--text-3); font-size: 12.5px; margin-bottom: 16px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; margin-bottom: 18px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; margin-bottom: 18px; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }
+  .stat .num { font-size: 26px; font-weight: 600; color: var(--accent); }
+  .stat .label { font-size: 12px; color: var(--text-3); }
+  table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; font-size: 13px; }
+  .tw { overflow-x: auto; }
+  .tw table { min-width: 100%; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; white-space: nowrap; }
+  th { background: #f1efe8; color: var(--text-2); font-weight: 500; font-size: 12.5px; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  .tag { display: inline-block; font-size: 11.5px; padding: 1px 8px; border-radius: 99px; background: var(--blue-bg); color: var(--blue); }
+  .tag.ok { background: var(--ok-bg); color: var(--ok); }
+  .tag.gray { background: #f1efe8; color: var(--text-2); }
+  .tag.warn { background: var(--warn-bg); color: var(--warn); }
+  .tag.off { background: var(--danger-bg); color: var(--danger); }
+  .btn { border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); border-radius: 8px; padding: 6px 14px; font-size: 13px; cursor: pointer; }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary:hover { opacity: .9; color: #fff; }
+  .btn.small { padding: 3px 10px; font-size: 12px; border-radius: 6px; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  form.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 12px; color: var(--text-2); }
+  .field input, .field select, .field textarea { border: 1px solid var(--border-strong); border-radius: 8px; padding: 7px 10px; font-size: 13px; font-family: inherit; min-width: 140px; background: #fff; }
+  .field textarea { min-width: 320px; }
+  .actions { display: inline-flex; gap: 2px; flex-wrap: nowrap; white-space: nowrap; vertical-align: middle; }
+  .actions .btn.small { border: none; background: none; padding: 3px 7px; color: var(--accent); border-radius: 5px; }
+  .actions .btn.small:hover { background: var(--accent-bg); border: none; color: var(--accent); }
+  .actions .btn.small.danger { color: var(--danger); }
+  .actions .btn.small.danger:hover { background: var(--danger-bg); color: var(--danger); }
+  pre.fileview { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; max-height: 55vh; overflow: auto; font-size: 12px; line-height: 1.55; white-space: pre-wrap; word-break: break-all; }
+  .empty { text-align: center; color: var(--text-3); padding: 30px 0; }
+  .modal-mask { position: fixed; inset: 0; background: rgba(40,40,38,.4); display: none; align-items: center; justify-content: center; z-index: 50; }
+  .modal-mask.show { display: flex; }
+  .modal { background: var(--surface); border-radius: 12px; padding: 22px 24px; width: min(560px, 92vw); max-height: 82vh; overflow: auto; }
+  .modal h3 { font-size: 15px; margin-bottom: 12px; }
+  .modal .foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  .keybox { font-family: "SF Mono", Menlo, monospace; background: #f1efe8; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; word-break: break-all; font-size: 13px; margin: 10px 0; }
+  .toast { position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%); background: #2c2c2a; color: #fff; padding: 9px 18px; border-radius: 8px; font-size: 13px; opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 99; }
+  .toast.show { opacity: .95; }
+  .code { font-family: "SF Mono", Menlo, monospace; font-size: 12px; color: var(--text-2); }
+  .step { display: flex; gap: 10px; margin-bottom: 8px; }
+  .step .n { flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--accent-bg); color: var(--accent); font-size: 12px; display: flex; align-items: center; justify-content: center; font-weight: 600; margin-top: 2px; }
+  .checkline { display: flex; align-items: center; gap: 8px; }
+  .checkline input[type=checkbox] { width: 15px; height: 15px; }
+  .terminal { background: #1e1e1c; color: #d5d3c8; font-family: "SF Mono", Menlo, monospace; font-size: 12px; padding: 12px 14px; border-radius: 8px; max-height: 360px; overflow: auto; white-space: pre-wrap; line-height: 1.55; }
+  .terminal .ok { color: #7bd8ab; } .terminal .err { color: #f09595; } .terminal .warn { color: #ef9f27; } .terminal .dim { color: #888780; }
+  .term-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .term-head b { font-size: 13.5px; }
+  .mono { font-family: "SF Mono", Menlo, monospace; font-size: 12px; background: #f1efe8; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; white-space: pre-wrap; word-break: break-all; max-height: 220px; overflow: auto; }
+  .ev-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .ev-tabs button { font-size: 12px; padding: 3px 10px; border-radius: 6px; border: 1px solid var(--border-strong); background: var(--surface); cursor: pointer; }
+  .ev-tabs button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .pass { color: var(--ok); font-weight: 500; } .fail { color: var(--danger); font-weight: 500; }
+  @media (max-width: 760px) {
+    header { padding: 10px 14px; flex-wrap: wrap; gap: 10px; }
+    nav { padding: 8px 12px 0; }
+    main { padding: 18px 12px 50px; }
+    .field input, .field select, .field textarea { min-width: 120px; }
+  }
+</style>
+<link rel="stylesheet" href="/static/workspace.css">
+</head>
+<body>
+<aside id="platformSidebar">
+  <a class="workspace-brand" href="#dashboard" onclick="event.preventDefault();go('dashboard')"><span class="workspace-mark">M</span> 模型测试</a>
+  <button id="workspaceNew" class="btn primary" onclick="workspaceNewTest()">新建测试</button>
+  <nav id="nav" aria-label="工作区导航"></nav>
+  <div class="workspace-history-heading">测试记录 <span id="workspaceHistoryCount">0</span></div>
+  <div id="workspaceHistory" aria-label="测试记录"></div>
+  <div class="workspace-sidebar-footer">本地工作空间</div>
+</aside>
+<div id="platformWorkspace">
+<header>
+  <h1>模型测试平台</h1>
+  <span class="phase">测试套件 · 压测报告</span>
+  <span class="pw-state" id="pwState"></span>
+</header>
+<main id="main"></main>
+</div>
+
+<div class="modal-mask" id="mask"><div class="modal" id="modalBox"></div></div>
+<div class="toast" id="toast"></div>
+
+<script src="/static/suites.js"></script>
+<script src="/static/reports.js"></script>
+<script src="/static/workspace.js"></script>
+<script>
+const API = "/api";
+let state = { tab: location.hash.slice(1) || "dashboard", providers: [], models: [], projects: [], stats: {}, legacyRoot: "" };
+
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function toast(msg, ms = 2200) {
+  $("#toast").textContent = msg; $("#toast").classList.add("show");
+  setTimeout(() => $("#toast").classList.remove("show"), ms);
+}
+async function api(path, opts = {}) {
+  const res = await fetch(API + path, { headers: { "Content-Type": "application/json" }, ...opts });
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.statusText); }
+  return res.json();
+}
+function openModal(html) { $("#modalBox").innerHTML = html; $("#mask").classList.add("show"); }
+function closeModal() { $("#mask").classList.remove("show"); }
+$("#mask").addEventListener("click", (e) => { if (e.target.id === "mask") closeModal(); });
+
+const TABS = [
+  ["dashboard", "压测工作台"],
+  ["overview", "总览"], ["providers", "中转站"], ["models", "模型"],
+  ["projects", "测试项目"], ["exec", "执行测试"], ["suites", "测试套件"],
+  ["reports", "压测报告"], ["matrix", "兼容性矩阵"], ["import", "导入旧资料"], ["settings", "设置"],
+];
+
+function renderNav() {
+  const primary = ['dashboard', 'suites', 'reports'];
+  const button = ([k, label]) => `<button class="${state.tab === k ? "active" : ""}" onclick="go('${k}')">${label}</button>`;
+  $("#nav").innerHTML = TABS.filter(([k]) => primary.includes(k)).map(button).join('') +
+    `<details ${primary.includes(state.tab) ? '' : 'open'}><summary>管理</summary>${TABS.filter(([k]) => !primary.includes(k)).map(button).join('')}</details>`;
+}
+function go(tab) { clearTimeout(workspacePoll); clearTimeout(suitePoll); state.tab = tab; history.replaceState(null, '', '#'+tab); renderNav(); render(); }
+window.go = go;
+
+async function refreshData() {
+  const [providers, models, projects, stats] = await Promise.all([
+    api("/providers"), api("/models"), api("/projects"), api("/stats"),
+  ]);
+  Object.assign(state, { providers, models, projects, stats });
+  $("#pwState").innerHTML = stats.password_set
+    ? '<span class="ok">主密码已设置</span>' : '<span class="no">主密码未设置（查看 Key 前需设置）</span>';
+}
+
+async function render() {
+  await refreshData();
+  refreshWorkspaceHistory();
+  const R = { dashboard: renderDashboard, overview: renderOverview, providers: renderProviders, models: renderModels,
+              projects: renderProjects, exec: renderExec, matrix: renderMatrix, import: renderImport, settings: renderSettings,
+              suites: renderSuites, reports: renderSuiteReports };
+  (R[state.tab] || renderDashboard)();
+}
+
+/* ---------------- 总览 ---------------- */
+function renderOverview() {
+  const s = state.stats;
+  $("#main").innerHTML = `
+    <h2>总览</h2>
+    <div class="grid">
+      <div class="stat"><div class="num">${s.providers}</div><div class="label">中转站</div></div>
+      <div class="stat"><div class="num">${s.models}</div><div class="label">模型</div></div>
+      <div class="stat"><div class="num">${s.projects}</div><div class="label">测试项目</div></div>
+      <div class="stat"><div class="num">${s.credentials}</div><div class="label">密钥（加密保存）</div></div>
+      <div class="stat"><div class="num">${s.imported_assets}</div><div class="label">已登记资产文件</div></div>
+      <div class="stat"><div class="num" style="color:var(--ok)">${s.runs_passed ?? 0}</div><div class="label">执行通过</div></div>
+      <div class="stat"><div class="num" style="color:var(--danger)">${s.runs_failed ?? 0}</div><div class="label">执行失败</div></div>
+    </div>
+    <div class="card">
+      <h2 style="margin-top:0">快速开始</h2>
+      <div class="step"><div class="n">1</div><div>在「设置」中设置平台主密码（用于查看 API Key 明文）。</div></div>
+      <div class="step"><div class="n">2</div><div>在「中转站」登记中转站网站、协议和 Key（Key 默认隐藏）。</div></div>
+      <div class="step"><div class="n">3</div><div>在「模型」中登记该中转站下的模型。</div></div>
+      <div class="step"><div class="n">4</div><div>在「测试项目」中登记测试项目（chat / stream / json / tools 四类会自动生成标准测试请求）。</div></div>
+      <div class="step"><div class="n">5</div><div>在「执行测试」中先「预览请求」，确认后开始真实测试，查看终端输出和请求响应证据。</div></div>
+      <div class="hint" style="margin:12px 0 0">执行遵循「HTTP 200 ≠ 测试通过」：JSON 输出、工具调用会做假成功检测；原始证据只读归档。</div>
+    </div>`;
+}
+
+/* ---------------- 中转站 ---------------- */
+function renderProviders() {
+  const rows = state.providers.map(p => `
+    <tr>
+      <td><b>${esc(p.name)}</b></td>
+      <td class="code">${esc(p.base_url) || "—"}</td>
+      <td><span class="tag">${esc(p.protocol)}</span></td>
+      <td>${p.model_count}</td>
+      <td>${p.credential_count ? p.key_hints.map(h => `<span class="tag gray">${esc(h)}</span>`).join(" ") : '<span style="color:var(--text-3)">无</span>'}</td>
+      <td>${p.enabled ? '<span class="tag">启用</span>' : '<span class="tag off">停用</span>'}</td>
+      <td class="actions">
+        <button class="btn small" onclick="editProvider(${p.id})">编辑</button>
+        <button class="btn small" onclick="manageKeys(${p.id})">密钥 ${p.credential_count}</button>
+        <button class="btn small" onclick="toggleProvider(${p.id}, ${!p.enabled})">${p.enabled ? "停用" : "启用"}</button>
+        <button class="btn small danger" onclick="delProvider(${p.id})">删除</button>
+      </td>
+    </tr>`).join("");
+  $("#main").innerHTML = `
+    <h2>中转站</h2>
+    <div class="hint">登记中转站网站、协议与 API Key。Key 加密保存、默认只显示掩码，查看明文需平台主密码验证。</div>
+    <div class="card">
+      <form class="row" onsubmit="return createProvider(event)">
+        <div class="field"><label>名称 *</label><input id="p_name" required placeholder="如 666api"></div>
+        <div class="field"><label>网站地址（Base URL）</label><input id="p_url" placeholder="https://example.com/v1"></div>
+        <div class="field"><label>协议</label><select id="p_protocol">
+          <option value="openai">OpenAI 兼容</option><option value="anthropic">Anthropic</option>
+          <option value="gemini">Gemini</option><option value="custom">自定义 HTTP</option></select></div>
+        <div class="field"><label>API Key（可选）</label><input id="p_key" type="password" placeholder="添加后默认隐藏"></div>
+        <button class="btn primary">登记中转站</button>
+      </form>
+    </div>
+    ${state.providers.length ? `<table><tr><th>名称</th><th>网站</th><th>协议</th><th>模型</th><th>密钥</th><th>状态</th><th>操作</th></tr>${rows}</table>` : '<div class="card empty">还没有登记中转站</div>'}`;
+}
+async function createProvider(e) {
+  e.preventDefault();
+  try {
+    await api("/providers", { method: "POST", body: JSON.stringify({
+      name: $("#p_name").value.trim(), base_url: $("#p_url").value.trim(),
+      protocol: $("#p_protocol").value, api_key: $("#p_key").value.trim(),
+    })});
+    toast("已登记"); render();
+  } catch (err) { toast(err.message); }
+  return false;
+}
+window.createProvider = createProvider;
+async function toggleProvider(id, enabled) {
+  try { await api(`/providers/${id}`, { method: "PUT", body: JSON.stringify({ enabled }) }); render(); } catch (err) { toast(err.message); }
+}
+window.toggleProvider = toggleProvider;
+async function delProvider(id) {
+  if (!confirm("删除该中转站将同时删除其下的模型与密钥记录，确定？")) return;
+  try { await api(`/providers/${id}`, { method: "DELETE" }); toast("已删除"); render(); } catch (err) { toast(err.message); }
+}
+window.delProvider = delProvider;
+function editProvider(id) {
+  const p = state.providers.find(x => x.id === id);
+  openModal(`<h3>编辑中转站 · ${esc(p.name)}</h3>
+    <div class="field" style="margin-bottom:10px"><label>名称</label><input id="ep_name" value="${esc(p.name)}" style="width:100%"></div>
+    <div class="field" style="margin-bottom:10px"><label>网站地址（Base URL）</label><input id="ep_url" value="${esc(p.base_url)}" style="width:100%"></div>
+    <div class="field" style="margin-bottom:10px"><label>协议</label><select id="ep_protocol" style="width:100%">
+      <option value="openai" ${p.protocol === "openai" ? "selected" : ""}>OpenAI 兼容</option>
+      <option value="anthropic" ${p.protocol === "anthropic" ? "selected" : ""}>Anthropic</option>
+      <option value="gemini" ${p.protocol === "gemini" ? "selected" : ""}>Gemini</option>
+      <option value="custom" ${p.protocol === "custom" ? "selected" : ""}>自定义 HTTP</option></select></div>
+    <div class="hint">修改 Key 请用「添加 Key」新增（旧 Key 可在查看弹窗中管理），已保存的 Key 不会明文回显。</div>
+    <div class="foot"><button class="btn" onclick="closeModal()">取消</button>
+    <button class="btn primary" onclick="saveProvider(${id})">保存修改</button></div>`);
+}
+window.editProvider = editProvider;
+async function saveProvider(id) {
+  try {
+    await api(`/providers/${id}`, { method: "PUT", body: JSON.stringify({
+      name: $("#ep_name").value.trim(), base_url: $("#ep_url").value.trim(), protocol: $("#ep_protocol").value }) });
+    closeModal(); toast("已保存修改"); render();
+  } catch (err) { toast(err.message); }
+}
+window.saveProvider = saveProvider;
+async function manageKeys(pid) {
+  const p = state.providers.find(x => x.id === pid);
+  if (!p) return;
+  const creds = await api(`/providers/${pid}/credentials`);
+  window._creds = creds;
+  const rows = creds.map(c => `<tr><td>${esc(c.label)}</td><td class="code">${esc(c.key_hint)}</td>
+    <td class="actions"><button class="btn small" onclick="revealOneKey(${c.id})">查看</button><button class="btn small danger" onclick="delKey(${pid}, ${c.id})">删除</button></td></tr>`).join("");
+  openModal(`<h3>API Key 管理 · ${esc(p.name)}</h3>
+    <div class="hint" style="margin-bottom:10px">可保存多个 Key（<b>新增不会覆盖已有</b>，执行测试时默认使用第一个）。Key 加密保存、只显示掩码，查看明文需输入平台主密码。</div>
+    ${creds.length ? `<table><tr><th>标签</th><th>掩码</th><th>操作</th></tr>${rows}</table>` : '<div class="hint">还没有 Key，在下方添加第一个。</div>'}
+    <div class="field" style="margin-top:14px"><label>平台主密码（查看明文用）</label>
+      <input id="k_pw" type="password" style="width:100%"></div>
+    <div id="key_reveal_out"></div>
+    <div class="field" style="margin-top:14px"><label>新增 Key（提交后立即加密，不再明文展示）</label>
+      <div style="display:flex;gap:8px">
+        <input id="k_label" placeholder="标签，如 主力号" style="flex:1">
+        <input id="k_new" type="password" placeholder="sk-..." style="flex:2">
+        <button class="btn primary" onclick="submitKey(${pid})">加密保存</button>
+      </div></div>
+    <div class="foot"><button class="btn" onclick="closeModal()">关闭</button></div>`);
+}
+window.manageKeys = manageKeys;
+async function revealOneKey(cid) {
+  const pw = $("#k_pw").value;
+  if (!pw) { toast("请先在上方输入平台主密码"); return; }
+  try {
+    const d = await api(`/credentials/${cid}/reveal`, { method: "POST", body: JSON.stringify({ password: pw }) });
+    $("#key_reveal_out").innerHTML = `<div class="keybox">${esc(d.label)} · ${esc(d.api_key)}</div><div class="hint">关闭弹窗后明文即不再展示。</div>`;
+  } catch (err) { $("#key_reveal_out").innerHTML = `<div class="hint" style="color:var(--danger)">${esc(err.message)}</div>`; }
+}
+window.revealOneKey = revealOneKey;
+async function delKey(pid, cid) {
+  if (!confirm("确定删除该 Key？删除后不可恢复。")) return;
+  try {
+    await api(`/credentials/${cid}`, { method: "DELETE" });
+    toast("已删除该 Key");
+    manageKeys(pid);
+  } catch (err) { toast(err.message); }
+}
+window.delKey = delKey;
+async function submitKey(pid) {
+  const key = $("#k_new").value.trim();
+  if (!key) { toast("请输入 Key"); return; }
+  try {
+    await api(`/providers/${pid}/credentials`, { method: "POST", body: JSON.stringify({ api_key: key, label: $("#k_label").value.trim() || "默认" }) });
+    toast("Key 已加密保存（新增，不影响已有）");
+    manageKeys(pid);
+  } catch (err) { toast(err.message); }
+}
+window.submitKey = submitKey;
+
+/* ---------------- 模型 ---------------- */
+function renderModels() {
+  const providerOpts = state.providers.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join("");
+  const rows = state.models.map(m => `
+    <tr>
+      <td class="code">${esc(m.model_name)}</td>
+      <td>${esc(m.display_name) || "—"}</td>
+      <td><span class="tag gray">${esc(m.provider_name)}</span></td>
+      <td>${m.model_url ? `<a href="${esc(m.model_url)}" target="_blank" rel="noopener">查看 ↗</a>` : '<span style="color:var(--text-3)">—</span>'}</td>
+      <td class="actions"><button class="btn small" onclick="editModel(${m.id})">编辑</button> <button class="btn small danger" onclick="delModel(${m.id})">删除</button></td>
+    </tr>`).join("");
+  $("#main").innerHTML = `
+    <h2>模型</h2>
+    <div class="hint">登记各中转站下的模型。各模型规格差异大且更新频繁，填写<b>官网 URL</b>即可随时跳转查看最新的上下文、价格和能力说明。</div>
+    <div class="card">
+      <form class="row" onsubmit="return createModel(event)">
+        <div class="field"><label>所属中转站 *</label><select id="m_provider">${providerOpts}</select></div>
+        <div class="field"><label>模型 ID *</label><input id="m_name" required placeholder="如 kimi-k3"></div>
+        <div class="field"><label>显示名</label><input id="m_display" placeholder="如 Kimi K3"></div>
+        <div class="field" style="flex:1;min-width:280px"><label>官网 URL</label><input id="m_url" style="width:100%" placeholder="https://… 模型官方文档/介绍页"></div>
+        <button class="btn primary" ${state.providers.length ? "" : "disabled"}>登记模型</button>
+      </form>
+    </div>
+    <div class="card">
+      <b style="font-size:13.5px">快捷登记：从中转站拉取模型列表</b>
+      <div class="hint" style="margin:6px 0 10px">调用中转站的 <span class="code">/v1/models</span> 接口（一般免费）获取全部可用模型，勾选后一键登记，无需手抄模型 ID。登记后再逐个补官网 URL 即可。</div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <select id="fetch_provider" style="padding:6px 10px;border:1px solid var(--border-strong);border-radius:8px">${providerOpts}</select>
+        <button class="btn" onclick="fetchRemoteModels()">拉取模型列表</button>
+      </div>
+    </div>
+    ${state.models.length ? `<table><tr><th>模型 ID</th><th>显示名</th><th>中转站</th><th>官网</th><th>操作</th></tr>${rows}</table>` : '<div class="card empty">还没有登记模型</div>'}`;
+}
+async function createModel(e) {
+  e.preventDefault();
+  try {
+    await api("/models", { method: "POST", body: JSON.stringify({
+      provider_id: +$("#m_provider").value, model_name: $("#m_name").value.trim(),
+      display_name: $("#m_display").value.trim(), model_url: $("#m_url").value.trim(),
+    })});
+    toast("已登记"); render();
+  } catch (err) { toast(err.message); }
+  return false;
+}
+window.createModel = createModel;
+async function delModel(id) {
+  if (!confirm("确定删除该模型？")) return;
+  try { await api(`/models/${id}`, { method: "DELETE" }); render(); } catch (err) { toast(err.message); }
+}
+window.delModel = delModel;
+async function fetchRemoteModels() {
+  const pid = +$("#fetch_provider").value;
+  if (!pid) { toast("请先选择中转站"); return; }
+  if (!confirm("将请求该中转站的模型列表接口（/v1/models，一般免费），确认？")) return;
+  try {
+    const r = await api("/models/fetch-remote", { method: "POST", body: JSON.stringify({ provider_id: pid }) });
+    if (!r.models.length) { toast("接口未返回任何模型"); return; }
+    window._fetched = { pid, models: r.models };
+    const rows = r.models.map((m, i) => `
+      <tr><td><div class="checkline"><input type="checkbox" class="fm-check" value="${i}">
+      <span class="code">${esc(m)}</span>${r.existing.includes(m) ? ' <span class="tag gray">已登记</span>' : ""}</div></td></tr>`).join("");
+    openModal(`<h3>拉取到 ${r.models.length} 个模型</h3>
+      <div class="hint">来源 <span class="code">${esc(r.url)}</span>。勾选要登记的模型（已登记的可重复勾选，将自动跳过）。</div>
+      <div style="max-height:320px;overflow:auto;border:1px solid var(--border);border-radius:8px">
+      <table><tr><th>模型 ID（勾选登记）</th></tr>${rows}</table></div>
+      <div class="foot"><button class="btn" onclick="closeModal()">取消</button>
+      <button class="btn primary" onclick="bulkRegister()">登记勾选项</button></div>`);
+  } catch (err) { toast(err.message); }
+}
+window.fetchRemoteModels = fetchRemoteModels;
+async function bulkRegister() {
+  const { pid, models } = window._fetched;
+  const names = [...document.querySelectorAll(".fm-check:checked")].map(c => models[+c.value]);
+  if (!names.length) { toast("请先勾选要登记的模型"); return; }
+  try {
+    const r = await api("/models/bulk", { method: "POST", body: JSON.stringify({ provider_id: pid, model_names: names }) });
+    closeModal(); toast(`已登记 ${r.created.length} 个，跳过已存在 ${r.skipped.length} 个`); render();
+  } catch (err) { toast(err.message); }
+}
+window.bulkRegister = bulkRegister;
+function editModel(id) {
+  const m = state.models.find(x => x.id === id);
+  const providerOpts = state.providers.map(p => `<option value="${p.id}" ${p.id === m.provider_id ? "selected" : ""}>${esc(p.name)}</option>`).join("");
+  openModal(`<h3>编辑模型 · ${esc(m.model_name)}</h3>
+    <div class="field" style="margin-bottom:10px"><label>所属中转站</label><select id="em_provider" style="width:100%">${providerOpts}</select></div>
+    <div class="field" style="margin-bottom:10px"><label>显示名</label><input id="em_display" value="${esc(m.display_name)}" style="width:100%"></div>
+    <div class="field" style="margin-bottom:10px"><label>官网 URL（随时查看最新规格）</label><input id="em_url" value="${esc(m.model_url)}" style="width:100%" placeholder="https://…"></div>
+    <div class="hint">模型 ID（${esc(m.model_name)}）是执行请求的目标标识，不可修改；如需更换请新建模型。</div>
+    <div class="foot"><button class="btn" onclick="closeModal()">取消</button>
+    <button class="btn primary" onclick="saveModel(${id})">保存修改</button></div>`);
+}
+window.editModel = editModel;
+async function saveModel(id) {
+  try {
+    await api(`/models/${id}`, { method: "PUT", body: JSON.stringify({
+      provider_id: +$("#em_provider").value, display_name: $("#em_display").value.trim(),
+      model_url: $("#em_url").value.trim(),
+    })});
+    closeModal(); toast("已保存修改"); render();
+  } catch (err) { toast(err.message); }
+}
+window.saveModel = saveModel;
+
+/* ---------------- 测试项目 ---------------- */
+function renderProjects() {
+  const providerOpts = `<option value="">— 无 —</option>` + state.providers.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join("");
+  const modelOpts = `<option value="">— 无 —</option>` + state.models.map(m => `<option value="${m.id}">${esc(m.model_name)}</option>`).join("");
+  const rows = state.projects.map(p => `
+    <tr>
+      <td><b>${esc(p.name)}</b></td>
+      <td><span class="tag ${p.source === "imported" ? "gray" : ""}">${esc(p.category)}</span></td>
+      <td>${esc(p.provider_name) || "—"}</td>
+      <td>${esc(p.model_name) || "—"}</td>
+      <td class="code">${p.exec_mode === "script" ? (esc(p.script_dir) || "—") : (esc(p.script_path) || "—")}</td>
+      <td>${p.asset_count || "—"}</td>
+      <td>${p.enabled ? '<span class="tag">启用</span>' : '<span class="tag warn">未启用</span>'}</td>
+      <td class="actions">
+        <button class="btn small" onclick="editProject(${p.id})">编辑</button>
+        <button class="btn small" onclick="toggleProject(${p.id}, ${!p.enabled})">${p.enabled ? "停用" : "启用"}</button>
+        ${p.asset_count ? `<button class="btn small" onclick="viewAssets(${p.id})">资产</button>` : ""}
+        <button class="btn small danger" onclick="delProject(${p.id})">删除</button>
+      </td>
+    </tr>`).join("");
+  $("#main").innerHTML = `
+    <h2>测试项目</h2>
+    <div class="hint">测试项目有三个来源：<b>① 手动登记</b>——完全自定义；<b>② 旧资料导入</b>——自动生成、默认停用，可再编辑；<b>③ 执行时自动构造标准请求</b>——分类为 chat / stream / json / tools 的项目，执行时平台自动生成对应的标准测试请求。<b>执行模式</b>可选「标准测试」或「脚本文件夹」：选脚本文件夹后填写本地脚本目录，执行时会在这个目录里逐文件运行（.py 用当前 Python、.sh/.bash 用 sh），也可在终端里直接输入命令运行；输出实时进入终端并落证据。</div>
+    <div class="card">
+      <form class="row" onsubmit="return createProject(event)">
+        <div class="field"><label>项目名称 *</label><input id="j_name" required placeholder="如 流式输出兼容性"></div>
+        <div class="field"><label>分类（可自定义输入）</label><input id="j_cat" list="cat_list" value="通用">
+          <datalist id="cat_list"><option>通用</option><option>chat</option><option>stream</option><option>json</option>
+          <option>tools</option><option>vision</option><option>context</option><option>并发压测</option><option>模型专项</option></datalist></div>
+        <div class="field"><label>中转站</label><select id="j_provider">${providerOpts}</select></div>
+        <div class="field"><label>模型</label><select id="j_model">${modelOpts}</select></div>
+        <div class="field"><label>执行模式</label><select id="j_exec_mode" onchange="toggleExecMode('j')">
+          <option value="builtin">标准测试（chat/stream/json/tools）</option>
+          <option value="script">脚本文件夹（在本服务器终端运行）</option></select></div>
+        <div class="field" id="j_script_dir_wrap" style="display:none"><label>脚本文件夹</label>
+          <div style="display:flex;gap:8px"><input id="j_script_dir" style="flex:1" placeholder="/path/to/scripts（只记录路径，不复制）">
+          <button class="btn small" type="button" onclick="openFolderPickerFor('j_script_dir')">浏览…</button></div></div>
+        <div class="field"><label>自定义命令</label><input id="j_cmd" placeholder="脚本模式下可填一次性命令（留空则跑文件夹内脚本）"></div>
+        <button class="btn primary">登记项目</button>
+      </form>
+    </div>
+    ${state.projects.length ? `<table><tr><th>名称</th><th>分类</th><th>中转站</th><th>模型</th><th>脚本</th><th>资产</th><th>状态</th><th>操作</th></tr>${rows}</table>` : '<div class="card empty">还没有登记测试项目</div>'}`;
+}
+async function createProject(e) {
+  e.preventDefault();
+  try {
+    await api("/projects", { method: "POST", body: JSON.stringify({
+      name: $("#j_name").value.trim(), category: $("#j_cat").value.trim() || "通用",
+      provider_id: +$("#j_provider").value || null, model_id: +$("#j_model").value || null,
+      script_path: "", command: $("#j_cmd").value.trim(),
+      script_dir: $("#j_script_dir").value.trim(), exec_mode: $("#j_exec_mode").value,
+    })});
+    toast("已登记"); render();
+  } catch (err) { toast(err.message); }
+  return false;
+}
+window.createProject = createProject;
+function toggleExecMode(prefix) {
+  const mode = document.getElementById(prefix + "_exec_mode").value;
+  const wrap = document.getElementById(prefix + "_script_dir_wrap");
+  if (wrap) wrap.style.display = mode === "script" ? "" : "none";
+}
+window.toggleExecMode = toggleExecMode;
+function editProject(id) {
+  const p = state.projects.find(x => x.id === id);
+  const providerOpts = `<option value="">— 无 —</option>` + state.providers.map(pr => `<option value="${pr.id}" ${pr.id === p.provider_id ? "selected" : ""}>${esc(pr.name)}</option>`).join("");
+  const modelOpts = `<option value="">— 无 —</option>` + state.models.map(m => `<option value="${m.id}" ${m.id === p.model_id ? "selected" : ""}>${esc(m.model_name)}</option>`).join("");
+  openModal(`<h3>编辑测试项目 · ${esc(p.name)}</h3>
+    <div class="field" style="margin-bottom:10px"><label>项目名称</label><input id="ej_name" value="${esc(p.name)}" style="width:100%"></div>
+    <div class="field" style="margin-bottom:10px"><label>分类（可自定义输入）</label><input id="ej_cat" list="cat_list2" value="${esc(p.category)}" style="width:100%">
+      <datalist id="cat_list2"><option>通用</option><option>chat</option><option>stream</option><option>json</option>
+      <option>tools</option><option>vision</option><option>context</option><option>并发压测</option><option>模型专项</option></datalist></div>
+    <div class="field" style="margin-bottom:10px"><label>中转站</label><select id="ej_provider" style="width:100%">${providerOpts}</select></div>
+    <div class="field" style="margin-bottom:10px"><label>模型</label><select id="ej_model" style="width:100%">${modelOpts}</select></div>
+    <div class="field" style="margin-bottom:10px"><label>执行模式</label><select id="ej_exec_mode" style="width:100%" onchange="toggleExecMode('ej')">
+      <option value="builtin" ${p.exec_mode !== "script" ? "selected" : ""}>标准测试（chat/stream/json/tools）</option>
+      <option value="script" ${p.exec_mode === "script" ? "selected" : ""}>脚本文件夹（在本服务器终端运行）</option></select></div>
+    <div class="field" style="margin-bottom:10px" id="ej_script_dir_wrap"><label>脚本文件夹</label>
+      <div style="display:flex;gap:8px"><input id="ej_script_dir" value="${esc(p.script_dir)}" style="flex:1">
+      <button class="btn small" type="button" onclick="openFolderPickerFor('ej_script_dir')">浏览…</button></div></div>
+    <div class="field" style="margin-bottom:10px"><label>自定义命令</label><input id="ej_cmd" value="${esc(p.command)}" style="width:100%"></div>
+    <div class="hint">来源：${esc(p.source === "imported" ? "旧资料导入" : "手动登记")} · 资产文件 ${p.asset_count} 个（只读引用）。导入的项目编辑分类并启用后即可执行。</div>
+    <div class="foot"><button class="btn" onclick="closeModal()">取消</button>
+    <button class="btn primary" onclick="saveProject(${id})">保存修改</button></div>`);
+  toggleExecMode('ej');
+}
+window.editProject = editProject;
+async function saveProject(id) {
+  try {
+    await api(`/projects/${id}`, { method: "PUT", body: JSON.stringify({
+      name: $("#ej_name").value.trim(), category: $("#ej_cat").value.trim() || "通用",
+      provider_id: +$("#ej_provider").value || null, model_id: +$("#ej_model").value || null,
+      script_path: "", command: $("#ej_cmd").value.trim(),
+      script_dir: $("#ej_script_dir").value.trim(), exec_mode: $("#ej_exec_mode").value,
+    })});
+    closeModal(); toast("已保存修改"); render();
+  } catch (err) { toast(err.message); }
+}
+window.saveProject = saveProject;
+async function toggleProject(id, enabled) {
+  try { await api(`/projects/${id}`, { method: "PUT", body: JSON.stringify({ enabled }) }); render(); } catch (err) { toast(err.message); }
+}
+window.toggleProject = toggleProject;
+async function delProject(id) {
+  if (!confirm("确定删除该测试项目（导入的资产记录会一并删除，原文件不受影响）？")) return;
+  try { await api(`/projects/${id}`, { method: "DELETE" }); render(); } catch (err) { toast(err.message); }
+}
+window.delProject = delProject;
+async function viewAssets(id) {
+  const assets = await api(`/projects/${id}/assets`);
+  const rows = assets.map(a => `<tr><td class="code">${esc(a.rel_path)}</td><td><span class="tag gray">${a.file_kind}</span></td><td>${(a.size_bytes/1024).toFixed(1)} KB</td>
+    <td class="actions"><button class="btn small" onclick="previewAsset(${a.id})">预览</button><button class="btn small" onclick="openAsset(${a.id})">打开</button></td></tr>`).join("");
+  openModal(`<h3>登记的资产文件（只读引用，不复制）</h3>
+    <table><tr><th>路径</th><th>类型</th><th>大小</th><th>操作</th></tr>${rows || '<tr><td colspan=4 class="empty">无</td></tr>'}</table>
+    <div class="hint" style="margin-top:8px">「预览」在本页查看内容（文本/图片）；「打开」调用系统默认软件（Excel 打开 .xlsx、浏览器打开 .html 等）。</div>
+    <div class="foot"><button class="btn" onclick="closeModal()">关闭</button></div>`);
+}
+window.viewAssets = viewAssets;
+async function previewAsset(aid) {
+  let d;
+  try { d = await api(`/assets/${aid}/preview`); } catch (err) { toast(err.message); return; }
+  showPreviewModal(d);
+}
+window.previewAsset = previewAsset;
+async function openAsset(aid) {
+  try { const r = await api(`/assets/${aid}/open`, { method: "POST" }); toast("已用系统默认软件打开"); }
+  catch (err) { toast(err.message); }
+}
+window.openAsset = openAsset;
+
+/* ---------------- 执行测试 ---------------- */
+let execJobId = null, execPollTimer = null;
+
+async function renderExec() {
+  const rows = state.projects.map(p => {
+    const isScript = p.exec_mode === "script";
+    const disabled = !p.enabled || isScript ? "disabled" : "";
+    return `
+    <tr>
+      <td><div class="checkline"><input type="checkbox" class="exec-check" value="${p.id}" ${disabled}>
+        <b>${esc(p.name)}</b></div></td>
+      <td><span class="tag ${["chat","stream","json","tools"].includes(p.category) ? "" : "gray"}">${esc(p.category)}</span>${isScript ? ' <span class="tag">脚本</span>' : ""}</td>
+      <td>${esc(p.provider_name) || '<span style="color:var(--danger)">未关联</span>'}</td>
+      <td>${esc(p.model_name) || '<span style="color:var(--text-3)">自动选首个</span>'}</td>
+      <td>${p.enabled ? (isScript ? '<span class="tag">脚本模式</span>' : '<span class="tag">启用</span>') : '<span class="tag off">停用</span>'}</td>
+    </tr>`; }).join("");
+  const runs = await api("/runs?limit=15");
+  const histRows = runs.map(r => `
+    <tr>
+      <td class="code">${esc(r.started_at)}</td>
+      <td>${esc(r.project_name)}</td>
+      <td>${esc(r.model_name)}</td>
+      <td>${r.http_status || "—"}</td>
+      <td class="${r.status === "passed" ? "pass" : "fail"}">${r.status === "passed" ? "通过" : r.status === "failed" ? "失败" : r.status}</td>
+      <td>${esc(r.verdict).slice(0, 40)}</td>
+      <td>${r.duration_ms}ms${r.ttft_ms ? ` / ${r.ttft_ms}ms` : ""}</td>
+      <td><button class="btn small" onclick="viewRun(${r.id})">证据</button></td>
+    </tr>`).join("");
+  $("#main").innerHTML = `
+    <h2>执行测试</h2>
+    <div class="hint">预览模式只展示将要发送的请求（Key 脱敏），不产生真实调用；<b>开始测试会向中转站发送真实付费请求</b>，需要显式确认。判定遵循「HTTP 200 ≠ 测试通过」，JSON/工具调用会做假成功检测。</div>
+    <div class="card">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+        <b style="font-size:13.5px">选择测试项目</b>
+        <button class="btn small" onclick="execSelectAll()">全选</button>
+        <span style="margin-left:auto"></span>
+        <button class="btn" onclick="doPreview()">预览请求（不发送）</button>
+        <button class="btn primary" onclick="startExec()">开始测试（真实请求）</button>
+      </div>
+      ${state.projects.length ? `<table><tr><th>项目</th><th>分类</th><th>中转站</th><th>模型</th><th>状态</th></tr>${rows}</table>` : '<div class="empty">还没有测试项目，先到「测试项目」登记</div>'}
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">脚本执行（在本服务器终端运行）</h3>
+      <div class="hint">选择「脚本文件夹」模式的测试项目，平台会列出该目录下的脚本；可<b>一键运行全部</b>、单独运行某个脚本，或在下面的输入框里<b>直接输入任意命令</b>运行。所有输出实时进入下方终端，并各自落证据。</div>
+      <div style="display:flex;gap:10px;align-items:center;margin:10px 0;flex-wrap:wrap">
+        <b style="font-size:13.5px">脚本项目</b>
+        <select id="script_proj" onchange="selectScriptProject()" style="min-width:240px">
+          <option value="">— 请选择 —</option>
+          ${state.projects.filter(p => p.exec_mode === "script" && p.script_dir).map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join("")}
+        </select>
+        ${state.projects.filter(p => p.exec_mode === "script").length ? "" : '<span class="dim">（暂无脚本模式项目，请到「测试项目」把执行模式改为「脚本文件夹」）</span>'}
+      </div>
+      <div id="script_panel"></div>
+    </div>
+    <div class="card" id="term-card" style="display:none">
+      <div class="term-head"><b>终端</b><span class="tag" id="term-status">运行中</span>
+        <button class="btn small" id="term-cancel" onclick="cancelJob()">取消</button></div>
+      <div class="terminal" id="term"></div>
+    </div>
+    <div id="exec-results"></div>
+    <h2>执行历史</h2>
+    ${runs.length ? `<table><tr><th>时间</th><th>项目</th><th>模型</th><th>HTTP</th><th>结果</th><th>判定</th><th>耗时/TTFT</th><th>证据</th></tr>${histRows}</table>` : '<div class="card empty">还没有执行记录</div>'}`;
+  if (window._scriptProjId) {
+    const sel = document.getElementById("script_proj");
+    if (sel) { sel.value = window._scriptProjId; renderScriptPanel(window._scriptProjId); }
+  }
+}
+window.renderExec = renderExec;
+
+/* ---------------- 脚本执行（本服务器终端） ---------------- */
+async function selectScriptProject() {
+  const id = $("#script_proj").value;
+  if (id) renderScriptPanel(id);
+  else $("#script_panel").innerHTML = "";
+}
+window.selectScriptProject = selectScriptProject;
+
+async function renderScriptPanel(projId) {
+  window._scriptProjId = +projId;
+  const panel = $("#script_panel");
+  panel.innerHTML = `<div class="dim">正在读取脚本列表…</div>`;
+  try {
+    const d = await api(`/projects/${projId}/scripts`);
+    const scripts = d.scripts;
+    const rows = scripts.length ? scripts.map(s => `
+      <tr>
+        <td class="code">${esc(s.name)}</td>
+        <td>${s.ext}</td>
+        <td>${(s.size / 1024).toFixed(1)} KB</td>
+        <td>${esc(s.mtime)}</td>
+        <td>${s.runnable ? '<span class="tag">可运行</span>' : '<span class="tag gray">跳过</span>'}</td>
+        <td class="actions"><button class="btn small" data-name="${esc(s.name)}" ${s.runnable ? "" : "disabled"} onclick="runOneScript(${projId}, this)">运行</button></td>
+      </tr>`).join("") : '<tr><td colspan=6 class="empty">文件夹内没有脚本文件</td></tr>';
+    panel.innerHTML = `
+      <div class="code" style="margin-bottom:8px">${esc(d.dir)}</div>
+      <div style="margin-bottom:10px"><button class="btn primary" onclick="runAllScripts(${projId})">一键运行全部</button></div>
+      <table><tr><th>脚本</th><th>类型</th><th>大小</th><th>修改时间</th><th>状态</th><th>操作</th></tr>${rows}</table>
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+        <input id="script_cmd" placeholder="输入命令运行，如：python demo.py --case 1 或 ls -la" style="flex:1;min-width:260px">
+        <button class="btn" onclick="runScriptCommand(${projId})">运行命令</button>
+      </div>`;
+  } catch (err) {
+    panel.innerHTML = `<div class="hint" style="color:var(--danger)">${esc(err.message)}</div>`;
+  }
+}
+window.renderScriptPanel = renderScriptPanel;
+
+async function runAllScripts(projId) {
+  try {
+    const r = await api("/execute-scripts", { method: "POST", body: JSON.stringify({ project_id: projId, script_names: [] }) });
+    beginJob(r.job_id);
+  } catch (err) { toast(err.message); }
+}
+window.runAllScripts = runAllScripts;
+
+async function runOneScript(projId, btn) {
+  const name = btn.dataset.name;
+  try {
+    const r = await api("/execute-scripts", { method: "POST", body: JSON.stringify({ project_id: projId, script_names: [name] }) });
+    beginJob(r.job_id);
+  } catch (err) { toast(err.message); }
+}
+window.runOneScript = runOneScript;
+
+async function runScriptCommand(projId) {
+  const cmd = $("#script_cmd").value.trim();
+  if (!cmd) { toast("请输入命令"); return; }
+  try {
+    const r = await api("/execute-scripts", { method: "POST", body: JSON.stringify({ project_id: projId, command: cmd }) });
+    beginJob(r.job_id);
+  } catch (err) { toast(err.message); }
+}
+window.runScriptCommand = runScriptCommand;
+
+function beginJob(jobId) {
+  execJobId = jobId;
+  $("#term-card").style.display = "";
+  $("#term").innerHTML = "";
+  $("#term-status").textContent = "运行中";
+  $("#term-cancel").disabled = false;
+  pollJob();
+}
+window.beginJob = beginJob;
+
+function execSelectAll() {
+  document.querySelectorAll(".exec-check:not(:disabled)").forEach(c => { c.checked = true; });
+}
+window.execSelectAll = execSelectAll;
+
+function execSelected() {
+  return [...document.querySelectorAll(".exec-check:checked")].map(c => +c.value);
+}
+
+async function doPreview() {
+  const ids = execSelected();
+  if (!ids.length) { toast("请先勾选测试项目"); return; }
+  try {
+    const r = await api("/preview", { method: "POST", body: JSON.stringify({ project_ids: ids }) });
+    const blocks = r.plans.map(p => p.error
+      ? `<h3 style="color:var(--danger)">${esc(p.project_name)}</h3><div class="hint">${esc(p.error)}</div>`
+      : `<h3>${esc(p.project_name)} <span class="tag">${p.category}</span></h3>
+         <div class="hint">${p.method} ${esc(p.url)}</div>
+         <div class="mono">${esc(JSON.stringify(p.headers, null, 2))}</div>
+         <div class="mono" style="margin-top:8px">${esc(JSON.stringify(p.body, null, 2))}</div>`).join("<hr>");
+    openModal(`<h3>请求预览（不发送）</h3>${blocks}
+      <div class="foot"><button class="btn" onclick="closeModal()">关闭</button>
+      <button class="btn primary" onclick="closeModal();startExec(true)">确认无误，开始真实测试</button></div>`);
+  } catch (err) { toast(err.message); }
+}
+window.doPreview = doPreview;
+
+async function startExec(skipConfirm) {
+  const ids = execSelected();
+  if (!ids.length) { toast("请先勾选测试项目"); return; }
+  if (!skipConfirm && !confirm("将向中转站发送真实付费请求（费用按各中转站计费），确认执行？")) return;
+  try {
+    const r = await api("/execute", { method: "POST", body: JSON.stringify({ project_ids: ids, confirmed: true }) });
+    beginJob(r.job_id);
+  } catch (err) { toast(err.message); }
+}
+window.startExec = startExec;
+
+async function pollJob() {
+  if (!execJobId) return;
+  try {
+    const j = await api(`/jobs/${execJobId}`);
+    $("#term").innerHTML = j.lines.map(l =>
+      `<span class="dim">[${l.ts}]</span> <span class="${l.kind}">${esc(l.text)}</span>`).join("\n");
+    $("#term").scrollTop = $("#term").scrollHeight;
+    $("#term-status").textContent = ({running: "运行中", finished: "已完成", cancelled: "已取消", error: "异常"})[j.status] || j.status;
+    if (j.status === "running") {
+      execPollTimer = setTimeout(pollJob, 800);
+      $("#term-cancel").disabled = false;
+    } else {
+      $("#term-cancel").disabled = true;
+      renderResults(j.runs);
+      refreshData().then(() => { if (state.tab === "exec") renderExecHistOnly(); });
+      toast(`任务${j.status === "finished" ? "完成" : j.status}`);
+    }
+  } catch (err) { toast(err.message); }
+}
+window.pollJob = pollJob;
+
+function renderResults(runs) {
+  if (!runs || !runs.length) { $("#exec-results").innerHTML = ""; return; }
+  const rows = runs.map(r => `
+    <tr>
+      <td><b>${esc(r.project_name)}</b></td>
+      <td>${esc(r.model_name)}</td>
+      <td>${r.http_status || "—"}</td>
+      <td class="${r.status === "passed" ? "pass" : "fail"}">${r.status === "passed" ? "通过" : r.status === "failed" ? "失败" : r.status}</td>
+      <td>${esc(r.verdict)}</td>
+      <td>${r.duration_ms}ms${r.ttft_ms ? ` / 首Token ${r.ttft_ms}ms` : ""}</td>
+      <td><button class="btn small" onclick="viewRun(${r.id})">证据</button></td>
+    </tr>`).join("");
+  $("#exec-results").innerHTML = `<div class="card"><h3 style="margin-top:0">本次结果</h3>
+    <table><tr><th>项目</th><th>模型</th><th>HTTP</th><th>判定</th><th>说明</th><th>耗时/TTFT</th><th>证据</th></tr>${rows}</table></div>`;
+}
+
+async function renderExecHistOnly() {
+  // 任务结束后仅刷新历史表（避免整页重绘打断证据查看）
+  const hist = $("#main");
+  renderExec();
+}
+
+async function cancelJob() {
+  if (!execJobId) return;
+  try { await api(`/jobs/${execJobId}/cancel`, { method: "POST" }); toast("已发送取消信号"); } catch (err) { toast(err.message); }
+}
+window.cancelJob = cancelJob;
+
+async function viewRun(id) {
+  try {
+    const r = await api(`/runs/${id}`);
+    const files = Object.keys(r.evidence || {});
+    const tabs = files.length
+      ? `<div class="ev-tabs" id="ev-tabs">${files.map((f, i) => `<button class="${i === 0 ? "on" : ""}" onclick="evTab('${f}')">${f}</button>`).join("")}</div><div class="mono" id="ev-body"></div>`
+      : '<div class="hint">证据目录为空（可能是执行前被取消）</div>';
+    openModal(`<h3>运行 #${r.id} 证据 <span class="tag">${esc(r.project_name)}</span> <span class="tag ${r.status === "passed" ? "" : "off"}">${r.status}</span></h3>
+      <div class="hint">${esc(r.verdict)} · 耗时 ${r.duration_ms}ms${r.ttft_ms ? ` · 首Token ${r.ttft_ms}ms` : ""} · 证据目录 <span class="code">${esc(r.evidence_dir)}</span></div>
+      ${tabs}
+      <div class="foot"><button class="btn" onclick="closeModal()">关闭</button></div>`);
+    window._ev = r.evidence;
+    if (files.length) evTab(files[0]);
+  } catch (err) { toast(err.message); }
+}
+window.viewRun = viewRun;
+
+function evTab(name) {
+  document.querySelectorAll("#ev-tabs button").forEach(b => b.classList.toggle("on", b.textContent === name));
+  const raw = window._ev[name];
+  let text = Array.isArray(raw) ? raw.join("\n") : raw;
+  try { text = JSON.stringify(JSON.parse(text), null, 2); } catch (e) {}
+  $("#ev-body").textContent = text || "（空）";
+}
+window.evTab = evTab;
+
+
+/* ---------------- 兼容性矩阵（阶段 4） ---------------- */
+const MX_CAT_CN = { chat: "对话", stream: "流式", json: "JSON", tools: "工具" };
+const MX_ST_CN = { compatible: "兼容", partial: "部分", unsupported: "不支持", unknown: "未知", untested: "未测试", manual_review: "待复核" };
+const MX_ST_CLS = { compatible: "ok", partial: "warn", unsupported: "off", unknown: "gray", untested: "gray", manual_review: "" };
+
+async function renderMatrix() {
+  const m = await api("/matrix");
+  state.matrix = m;
+  const cats = m.categories, s = m.summary;
+  const stats = `
+    <div class="stat"><div class="num" style="color:var(--ok)">${s.compatible}</div><div class="label">兼容</div></div>
+    <div class="stat"><div class="num" style="color:var(--warn)">${s.partial}</div><div class="label">部分支持</div></div>
+    <div class="stat"><div class="num" style="color:var(--danger)">${s.unsupported}</div><div class="label">不支持</div></div>
+    <div class="stat"><div class="num">${s.unknown}</div><div class="label">未知</div></div>
+    <div class="stat"><div class="num" style="color:var(--text-3)">${s.untested}</div><div class="label">未测试</div></div>
+    <div class="stat"><div class="num" style="color:var(--accent)">${s.manual_review}</div><div class="label">待复核</div></div>`;
+  const head = cats.map(c => `<th>${esc(MX_CAT_CN[c] || c)}</th>`).join("");
+  const rows = m.rows.map((row, i) => `
+    <tr>
+      <td><b>${esc(row.model_name)}</b></td>
+      <td>${esc(row.provider_name)}</td>
+      ${cats.map((c, j) => {
+        const cell = row.cells[c] || { effective_status: "untested", basis: "未测试" };
+        const st = cell.effective_status || "untested";
+        const manual = (cell.override_status || cell.note) ? " ✎" : "";
+        const tip = [cell.basis, cell.note ? "备注：" + cell.note : ""].filter(Boolean).join("；");
+        return `<td><span class="tag ${MX_ST_CLS[st] || "gray"}" style="cursor:pointer" title="${esc(tip)}" onclick="cellDetail(${i},${j})">${MX_ST_CN[st] || st}${manual}</span></td>`;
+      }).join("")}
+    </tr>`).join("");
+  $("#main").innerHTML = `
+    <h2>兼容性矩阵</h2>
+    <div class="hint">同一模型的多行相邻排列，即<b>跨中转站对比</b>——同一模型在不同中转站的能力差异一目了然。结论由运行记录自动聚合：兼容 = 全部通过；部分 = 有通过有失败；不支持 = 全部假成功（HTTP 200 但功能未生效）；未知 = 失败但属鉴权/限流/服务端错误。<b>✎</b> 表示已有人工复核。点击色块查看明细、复核与备注。</div>
+    <div class="grid">${stats}</div>
+    ${m.rows.length ? `<table><tr><th>模型</th><th>中转站</th>${head}</tr>${rows}</table>` : '<div class="card empty">还没有可展示的数据——先到「执行测试」跑一轮，或在「中转站」「模型」完成登记</div>'}
+    <div class="hint" style="margin-top:10px">图例：<span class="tag ok">兼容</span> <span class="tag warn">部分</span> <span class="tag off">不支持</span> <span class="tag gray">未知 / 未测试</span> <span class="tag">待复核</span></div>`;
+}
+window.renderMatrix = renderMatrix;
+
+async function cellDetail(i, j) {
+  const m = state.matrix;
+  const row = m.rows[i], cat = m.categories[j];
+  if (!row) return;
+  let d;
+  try { d = await api(`/matrix/detail?provider_id=${row.provider_id}&model_name=${encodeURIComponent(row.model_name)}&category=${encodeURIComponent(cat)}`); }
+  catch (err) { toast(err.message); return; }
+  window._mx = { row, cat };
+  const runRows = d.runs.map(r => `
+    <tr>
+      <td class="code">${esc(r.started_at)}</td>
+      <td>${esc(r.project_name)}</td>
+      <td>${r.http_status || "—"}</td>
+      <td class="${r.status === "passed" ? "pass" : "fail"}">${r.status === "passed" ? "通过" : "失败"}</td>
+      <td>${esc(r.verdict).slice(0, 50)}</td>
+      <td>${r.duration_ms}ms${r.ttft_ms ? ` / ${r.ttft_ms}ms` : ""}</td>
+      <td><button class="btn small" onclick="viewRun(${r.id})">证据</button></td>
+    </tr>`).join("");
+  const review = d.review || {};
+  openModal(`<h3>${esc(row.model_name)} · ${esc(row.provider_name)} · ${esc(MX_CAT_CN[cat] || cat)}</h3>
+    <div class="hint">该组合共 ${d.runs.length} 次执行记录。原始证据只读，人工复核不会改变运行记录。</div>
+    <div style="max-height:38vh;overflow:auto">
+    ${d.runs.length ? `<table><tr><th>时间</th><th>项目</th><th>HTTP</th><th>结果</th><th>判定</th><th>耗时/TTFT</th><th>证据</th></tr>${runRows}</table>` : '<div class="empty">该分类还没有执行记录</div>'}
+    </div>
+    <h3 style="margin-top:16px">人工复核</h3>
+    <div class="field" style="margin-bottom:10px"><label>复核结论（覆盖自动聚合，留空 = 跟随自动结论）</label>
+      <select id="mx_status">
+        <option value="">（自动聚合）</option>
+        <option value="compatible">兼容</option>
+        <option value="partial">部分支持</option>
+        <option value="unsupported">不支持</option>
+        <option value="unknown">未知</option>
+        <option value="manual_review">待复核</option>
+      </select></div>
+    <div class="field"><label>备注</label><textarea id="mx_note" placeholder="记录例外情况、复测计划、个例级差异等">${esc(review.note || "")}</textarea></div>
+    <div class="foot"><button class="btn" onclick="mxReview(false)">清除复核</button>
+    <button class="btn" onclick="closeModal()">关闭</button>
+    <button class="btn primary" onclick="mxReview(true)">保存复核</button></div>`);
+  if (review.override_status) $("#mx_status").value = review.override_status;
+}
+window.cellDetail = cellDetail;
+
+async function mxReview(save) {
+  const { row, cat } = window._mx;
+  const body = save
+    ? { provider_id: row.provider_id, model_name: row.model_name, category: cat,
+        override_status: $("#mx_status").value, note: $("#mx_note").value.trim() }
+    : { provider_id: row.provider_id, model_name: row.model_name, category: cat, override_status: "", note: "" };
+  try {
+    await api("/matrix/review", { method: "POST", body: JSON.stringify(body) });
+    closeModal(); toast(save ? "复核已保存" : "复核已清除"); renderMatrix();
+  } catch (err) { toast(err.message); }
+}
+window.mxReview = mxReview;
+
+
+/* ---------------- 导入 ---------------- */
+async function renderImport() {
+  const scan = await api("/import/scan", { method: "POST", body: JSON.stringify({}) });
+  state.legacyRoot = scan.root;
+  const rows = scan.items.map((it, i) => `
+    <tr>
+      <td><div class="checkline"><input type="checkbox" class="imp-check" value="${esc(it.name)}" ${it.imported ? "disabled" : ""}>
+      <b>${esc(it.name)}</b>${it.imported ? '<span class="tag gray">已导入</span>' : ""}</div></td>
+      <td><span class="tag ${it.type === "dir" ? "" : "gray"}">${it.type === "dir" ? "目录" : "文件"}</span></td>
+      <td>${it.file_count}</td>
+      <td>${(it.size_bytes / 1048576).toFixed(1)} MB</td>
+      <td><span class="tag gray">${esc(it.category)}</span></td>
+      <td class="actions"><button class="btn small" onclick="viewItemFiles(${i})">内容</button></td>
+    </tr>`).join("");
+  window._scanItems = scan.items;
+  $("#main").innerHTML = `
+    <h2>导入旧资料</h2>
+    <div class="hint">扫描旧测试目录（<span class="code">${esc(scan.root)}</span>）并登记为测试项目。只记录文件路径，<b>不移动、不复制、不修改</b>任何原文件。</div>
+    <div class="card">
+      <form class="row" onsubmit="return doImport(event)">
+        <div class="field" style="flex:1"><label>旧资料根目录</label><input id="i_root" style="width:100%;min-width:320px" value="${esc(scan.root)}"></div>
+        <button class="btn" type="button" onclick="openFolderPicker()">浏览…</button>
+        <button class="btn" type="button" onclick="renderImport()">重新扫描</button>
+        <button class="btn primary">导入勾选项</button>
+      </form>
+    </div>
+    ${scan.items.length ? `<table><tr><th>名称</th><th>类型</th><th>文件数</th><th>大小</th><th>建议分类</th><th>操作</th></tr>${rows}</table>` : '<div class="card empty">未扫描到可导入内容</div>'}`;
+}
+window.renderImport = renderImport;
+async function viewItemFiles(i) {
+  const it = window._scanItems[i];
+  if (!it) return;
+  let d;
+  try { d = await api("/import/item-files", { method: "POST", body: JSON.stringify({ name: it.name }) }); }
+  catch (err) { toast(err.message); return; }
+  window._itemFiles = d.files;
+  const kinds = {};
+  d.files.forEach(f => kinds[f.kind] = (kinds[f.kind] || 0) + 1);
+  const summary = Object.entries(kinds).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}×${v}`).join(" · ");
+  const rows = d.files.map((f, j) => `<tr><td class="code">${esc(f.rel_path)}</td><td><span class="tag gray">${f.kind}</span></td><td>${(f.size_bytes/1024).toFixed(1)} KB</td>
+    <td class="actions"><button class="btn small" onclick="previewItemFile(${j})">预览</button><button class="btn small" onclick="openItemFile(${j})">打开</button></td></tr>`).join("");
+  openModal(`<h3>内容构成 · ${esc(it.name)}</h3>
+    <div class="hint" style="margin-bottom:10px">共 ${d.total} 个文件：${esc(summary)}${d.truncated ? "（仅列出前 2000 个）" : ""}。原文件只读，不移动、不复制、不修改。</div>
+    <div style="max-height:55vh;overflow:auto"><table><tr><th>路径</th><th>类型</th><th>大小</th><th>操作</th></tr>${rows || '<tr><td colspan=4 class="empty">无</td></tr>'}</table></div>
+    <div class="foot"><button class="btn" onclick="closeModal()">关闭</button></div>`);
+}
+window.viewItemFiles = viewItemFiles;
+async function previewItemFile(j) {
+  const f = window._itemFiles[j];
+  if (!f) return;
+  let d;
+  try { d = await api(`/files/preview?path=${encodeURIComponent(f.rel_path)}`); }
+  catch (err) { toast(err.message); return; }
+  showPreviewModal(d);
+}
+window.previewItemFile = previewItemFile;
+async function openItemFile(j) {
+  const f = window._itemFiles[j];
+  if (!f) return;
+  try { await api(`/files/open?path=${encodeURIComponent(f.rel_path)}`, { method: "POST" }); toast("已用系统默认软件打开"); }
+  catch (err) { toast(err.message); }
+}
+window.openItemFile = openItemFile;
+function showPreviewModal(d) {
+  let body;
+  if (d.kind === "text") {
+    body = `<pre class="fileview">${esc(d.content)}</pre>` +
+      (d.truncated ? '<div class="hint" style="margin-top:6px">文件较大，仅显示前 200KB，完整内容请用「打开」。</div>' : "");
+  } else if (d.kind === "image") {
+    body = `<img src="${d.data}" alt="预览" style="max-width:100%;border:1px solid var(--border);border-radius:8px">`;
+  } else {
+    body = `<div class="hint">二进制文件（${(d.size/1024).toFixed(1)} KB），无法在线预览，请点「打开」用对应软件查看。</div>`;
+  }
+  openModal(`<h3 class="code" style="font-size:15px">${esc(d.name)}</h3>${body}
+    <div class="foot"><button class="btn" onclick="closeModal()">关闭</button></div>`);
+}
+window.showPreviewModal = showPreviewModal;
+async function doImport(e) {
+  e.preventDefault();
+  const folders = [...document.querySelectorAll(".imp-check:checked")].map(c => c.value);
+  if (!folders.length) { toast("请先勾选要导入的目录"); return false; }
+  try {
+    const r = await api("/import/execute", { method: "POST", body: JSON.stringify({ root: $("#i_root").value, folders }) });
+    toast(`已导入 ${r.created.length} 个项目，登记 ${r.assets_added} 个文件`); render();
+  } catch (err) { toast(err.message); }
+  return false;
+}
+window.doImport = doImport;
+
+/* 文件夹选择器：浏览本机目录，选择后回填到指定输入框 */
+let pickerPath = "";
+window._pickerTarget = null;  // 非空时回填到该 input id（否则回填导入根目录）
+function openFolderPicker() {
+  window._pickerTarget = null;
+  pickerPath = ($("#i_root") ? $("#i_root").value.trim() : "");
+  renderPicker();
+}
+function openFolderPickerFor(inputId) {
+  window._pickerTarget = inputId;
+  const el = document.getElementById(inputId);
+  pickerPath = el ? el.value.trim() : "";
+  renderPicker();
+}
+window.openFolderPicker = openFolderPicker;
+window.openFolderPickerFor = openFolderPickerFor;
+async function renderPicker() {
+  try {
+    const p = await api(`/fs/browse?path=${encodeURIComponent(pickerPath)}`);
+    pickerPath = p.path;
+    window._pkDirs = p.dirs;
+    window._pkParent = p.parent;
+    const rows = (p.parent ? `<tr><td><button class="btn small" onclick="pickerGo(window._pkParent)">↩ 上级目录</button></td></tr>` : "") +
+      p.dirs.map((d, i) => `<tr><td><button class="btn small" onclick="pickerEnter(${i})">📁 ${esc(d)}</button></td></tr>`).join("");
+    openModal(`<h3>选择文件夹</h3>
+      <div class="code" style="margin-bottom:10px">${esc(p.path)}</div>
+      <div style="max-height:320px;overflow:auto;border:1px solid var(--border);border-radius:8px">
+      <table><tr><th>子目录（点击进入）</th></tr>${rows || '<tr><td class="empty">无子目录</td></tr>'}</table></div>
+      <div class="foot"><button class="btn" onclick="closeModal()">取消</button>
+      <button class="btn primary" onclick="pickerSelect()">选择当前目录</button></div>`);
+  } catch (err) { toast(err.message); }
+}
+async function pickerGo(path) { pickerPath = path; await renderPicker(); }
+function pickerEnter(i) { pickerGo(pickerPath.replace(/\/$/, "") + "/" + window._pkDirs[i]); }
+function pickerSelect() {
+  if (window._pickerTarget) {
+    const input = document.getElementById(window._pickerTarget);
+    if (input) input.value = pickerPath;
+    window._pickerTarget = null;
+    closeModal();
+    return;
+  }
+  const input = $("#i_root");
+  if (input) input.value = pickerPath;
+  closeModal(); toast("已选择目录，正在重新扫描…"); renderImport();
+}
+window.pickerGo = pickerGo;
+window.pickerEnter = pickerEnter;
+window.pickerSelect = pickerSelect;
+
+/* ---------------- 设置 ---------------- */
+function renderSettings() {
+  const set = state.stats.password_set;
+  $("#main").innerHTML = `
+    <h2>设置</h2>
+    <div class="card">
+      <h2 style="margin-top:0">平台主密码</h2>
+      <div class="hint">主密码用于验证后临时查看 API Key 明文。${set ? "已设置，可直接修改。" : "尚未设置——不设置则无法查看任何 Key 明文。"}</div>
+      <form class="row" onsubmit="return setPassword(event)">
+        <div class="field"><label>${set ? "新密码" : "设置密码"}（至少 6 位）</label><input id="s_pw1" type="password" required minlength="6"></div>
+        <div class="field"><label>再次输入</label><input id="s_pw2" type="password" required minlength="6"></div>
+        <button class="btn primary">保存</button>
+      </form>
+    </div>
+    <div class="card">
+      <h2 style="margin-top:0">数据与执行</h2>
+      <div class="hint">
+        · API Key 使用 Fernet 加密存储，列表只显示掩码<br>
+        · 查看明文需主密码重新认证<br>
+        · 导入功能只读，不移动不修改旧文件<br>
+        · 实际测试需预览并确认执行
+      </div>
+    </div>`;
+}
+async function setPassword(e) {
+  e.preventDefault();
+  if ($("#s_pw1").value !== $("#s_pw2").value) { toast("两次输入不一致"); return false; }
+  try {
+    await api("/security/set-password", { method: "POST", body: JSON.stringify({ password: $("#s_pw1").value }) });
+    toast("主密码已保存"); render();
+  } catch (err) { toast(err.message); }
+  return false;
+}
+window.setPassword = setPassword;
+
+renderNav();
+render();
+
+// 表格自适应：窗口变窄时表格整体横向滚动，而不是挤压换行错位
+function wrapTables() {
+  document.querySelectorAll("table:not(.wrapped)").forEach(t => {
+    if (!t.parentNode) return;
+    if (t.parentNode.classList && t.parentNode.classList.contains("tw")) { t.classList.add("wrapped"); return; }
+    const d = document.createElement("div");
+    d.className = "tw";
+    t.parentNode.insertBefore(d, t);
+    d.appendChild(t);
+    t.classList.add("wrapped");
+  });
+}
+window.wrapTables = wrapTables;
+new MutationObserver(() => wrapTables()).observe(document.body, { childList: true, subtree: true });
+</script>
+</body>
+</html>

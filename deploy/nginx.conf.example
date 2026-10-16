@@ -1,0 +1,29 @@
+server {
+    listen 80;
+    server_name SERVER_ADDRESS;
+    location /.well-known/acme-challenge/ { root /var/www/model-test-acme; }
+    location / { return 301 https://$host$request_uri; }
+}
+server {
+    listen 443 ssl;
+    server_name SERVER_ADDRESS;
+    ssl_certificate /etc/letsencrypt/live/model-test/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/model-test/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    server_tokens off;
+    client_max_body_size 128m;
+    auth_basic "Model Test Platform";
+    auth_basic_user_file /etc/model-test/htpasswd;
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy same-origin always;
+    location / {
+        proxy_pass http://127.0.0.1:8032;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_http_version 1.1;
+        proxy_buffering off;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+}

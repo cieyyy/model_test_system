@@ -1,0 +1,18 @@
+{
+  "base_url": "https://YOUR_PROVIDER/v1",
+  "api_key_env": "AZ_CHANNEL_API_KEY",
+  "auth_header": "authorization",
+  "models": "all",
+  "include_regex": "",
+  "exclude_regex": "(?i)(^|[-_.:/ ])(image|gpt-image|dall[-_ ]?e|sora|flux|stable[-_ ]?diffusion|sdxl|midjourney|mj-|imagen|recraft|ideogram|kolors|wanx|seedream|doubao-seedream)($|[-_.:/ ])",
+  "model_limit": 0,
+  "cases": ["az", "models", "concurrency"],
+  "endpoint": "chat",
+  "token_param": "max_tokens",
+  "timeout_seconds": 90,
+  "max_output_tokens": 32,
+  "temperature": null,
+  "concurrency_levels": [1, 5],
+  "concurrency_requests": 2,
+  "concurrency_models": "all"
+}

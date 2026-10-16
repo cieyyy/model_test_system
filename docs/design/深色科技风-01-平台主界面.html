@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>深色科技风 · 平台主界面设计稿</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#0D1117; font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; color:#C9D1D9; font-size:13px; padding:24px; }
+.mono { font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace; }
+.frame { background:#0D1117; border:1px solid #30363D; border-radius:12px; overflow:hidden; display:flex; min-height:620px; }
+.sidebar { width:200px; background:#090C10; border-right:1px solid #1F2630; padding:16px 0; flex-shrink:0; }
+.brand { padding:0 16px 20px; display:flex; align-items:center; gap:8px; }
+.logo { width:28px; height:28px; border-radius:6px; background:#1F6FEB; display:flex; align-items:center; justify-content:center; color:#fff; font-size:14px; font-weight:600; }
+.brand span { font-weight:600; color:#F0F6FC; font-size:14px; }
+.ver { font-size:11px; color:#6E7681; padding:0 16px 12px; }
+.nav-active { padding:8px 16px; color:#58A6FF; background:rgba(31,111,235,0.12); border-left:2px solid #58A6FF; }
+.nav-item { display:block; padding:8px 16px; color:#8B949E; text-decoration:none; }
+.nav-item:hover { color:#C9D1D9; background:rgba(110,118,129,0.08); }
+.svc { margin:36px 14px 0; padding:12px; border:1px solid #1F2630; border-radius:8px; background:#0D1117; font-size:11px; color:#6E7681; line-height:1.7; }
+.svc .ok { color:#3FB950; }
+.main { flex:1; padding:20px 24px; min-width:0; }
+.pagehead { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
+.pagehead h1 { font-size:16px; font-weight:600; color:#F0F6FC; }
+.pagehead .sub { font-size:11px; color:#6E7681; margin-top:3px; }
+.btn-primary { font-size:13px; padding:6px 16px; border:1px solid #238636; border-radius:6px; background:#238636; color:#fff; cursor:pointer; }
+.cards { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-bottom:16px; }
+.card { background:#161B22; border:1px solid #30363D; border-radius:8px; padding:14px; }
+.card .label { font-size:11px; color:#8B949E; letter-spacing:.5px; }
+.card .num { font-size:26px; font-weight:600; margin-top:5px; color:#F0F6FC; }
+.card .num.green { color:#3FB950; } .card .num.red { color:#F85149; } .card .num.blue { color:#58A6FF; }
+.panel { background:#161B22; border:1px solid #30363D; border-radius:8px; padding:16px 18px; margin-bottom:16px; }
+.panel h2 { font-size:13px; font-weight:600; color:#F0F6FC; display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+.panel h2 a { font-size:11px; color:#58A6FF; font-weight:400; text-decoration:none; }
+table { width:100%; border-collapse:collapse; font-size:12px; }
+th { text-align:left; color:#6E7681; font-weight:400; font-size:11px; padding:6px 8px; border-bottom:1px solid #21262D; }
+td { padding:9px 8px; border-bottom:1px solid #21262D; }
+tr:last-child td { border-bottom:none; }
+.v-pass { color:#3FB950; } .v-fail { color:#F85149; } .v-part { color:#D29922; }
+.muted { color:#8B949E; }
+.legend { font-size:11px; color:#6E7681; font-weight:400; }
+.grid5 { display:grid; grid-template-columns:1.6fr repeat(4,1fr); gap:4px; }
+.grid5 > div { padding:5px 8px; font-size:12px; }
+.grid5 .head { color:#6E7681; font-size:11px; }
+.cell-pass { color:#3FB950; } .cell-part { color:#D29922; } .cell-fail { color:#F85149; } .cell-unknown { color:#8B949E; }
+.note { margin-top:16px; font-size:11px; color:#6E7681; line-height:1.7; }
+</style>
+</head>
+<body>
+<div class="frame">
+<nav class="sidebar">
+<div class="brand"><div class="logo">测</div><span>模型测试平台</span></div>
+<div class="ver mono">v0.4.2 · 本地</div>
+<div class="nav-active">▣ 总览</div>
+<a class="nav-item" href="#">⌁ 中转站</a>
+<a class="nav-item" href="#">◇ 模型</a>
+<a class="nav-item" href="#">▣ 测试项目</a>
+<a class="nav-item" href="#">▶ 执行测试</a>
+<a class="nav-item" href="#">≡ 兼容性矩阵</a>
+<a class="nav-item" href="#">⇩ 导入旧资料</a>
+<a class="nav-item" href="#">⚙ 设置</a>
+<div class="svc mono">
+<div class="ok">● 服务运行中</div>
+<div>:8032 api</div>
+<div>:8090 mock</div>
+</div>
+</nav>
+<main class="main">
+<div class="pagehead">
+<div>
+<h1>总览</h1>
+<div class="sub mono">2026-09-30 · 4 个中转站 · 12 个模型</div>
+</div>
+<button class="btn-primary">▶ 全量测试</button>
+</div>
+<div class="cards">
+<div class="card"><div class="label">测试次数</div><div class="num">38</div></div>
+<div class="card"><div class="label">通过</div><div class="num green">29</div></div>
+<div class="card"><div class="label">假成功</div><div class="num red">3</div></div>
+<div class="card"><div class="label">证据文件</div><div class="num blue">1.2k</div></div>
+</div>
+<div class="panel">
+<h2>最近测试运行 <a href="#">查看全部 →</a></h2>
+<table class="mono">
+<tr><th>运行</th><th>中转站</th><th>模型</th><th>判定</th><th>用例</th><th>耗时</th></tr>
+<tr><td>#r-0038</td><td class="muted">relay-a</td><td>deepseek-4.1</td><td class="v-pass">● 通过</td><td class="muted">4/4</td><td>2.1s</td></tr>
+<tr><td>#r-0037</td><td class="muted">relay-a</td><td>mock-silent</td><td class="v-fail">▲ 假成功</td><td class="muted">3/4</td><td>0.9s</td></tr>
+<tr><td>#r-0036</td><td class="muted">kimi-k3</td><td>kimi-k3</td><td class="v-part">◐ 部分支持</td><td class="muted">3/4</td><td>3.4s</td></tr>
+</table>
+</div>
+<div class="panel">
+<h2>兼容性概览 <span class="legend">对话 / 流式 / JSON / 工具</span></h2>
+<div class="grid5 mono">
+<div class="head">模型</div><div class="head">对话</div><div class="head">流式</div><div class="head">JSON</div><div class="head">工具</div>
+<div>deepseek-4.1</div><div class="cell-pass">■</div><div class="cell-pass">■</div><div class="cell-pass">■</div><div class="cell-pass">■</div>
+<div>glm-5.3</div><div class="cell-pass">■</div><div class="cell-pass">■</div><div class="cell-part">▣</div><div class="cell-pass">■</div>
+<div>mock-silent</div><div class="cell-pass">■</div><div class="cell-fail">✕</div><div class="cell-fail">✕</div><div class="cell-unknown">?</div>
+</div>
+</div>
+<div class="note">设计说明：■ 通过 · ▣ 部分支持 · ✕ 假成功 · ? 未知待人工复核。底色 #0D1117，面板 #161B22，边框 #30363D；蓝 #58A6FF 为链接与主色。界面文字全中文（协议、模型名、端口等技术标识保留原文）。</div>
+</main>
+</div>
+</body>
+</html>

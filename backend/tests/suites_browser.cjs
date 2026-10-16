@@ -1,0 +1,65 @@
+const { chromium } = require('playwright');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+
+(async () => {
+  const output = process.env.SUITE_UI_OUTPUT || path.resolve(__dirname, '../../outputs/suite-ui');
+  fs.mkdirSync(output, { recursive: true });
+  const browser = await chromium.launch({headless:true});
+  const page = await browser.newPage({viewport:{width:1440,height:1100}});
+  const errors = [];
+  page.on('pageerror', e=>errors.push(e.message));
+  try {
+    await page.goto(process.env.SUITE_URL || 'http://127.0.0.1:8032');
+    await page.getByRole('button',{name:'测试套件',exact:true}).click();
+    await page.waitForSelector('#sqDemo');
+    await page.check('#sqDemo');
+    await page.fill('#sp_total_requests','3');
+    await page.selectOption('#sqConcurrencyMode','range');
+    await page.fill('#sqStart','1');
+    await page.fill('#sqEnd','3');
+    await page.fill('#sqStep','1');
+    await page.fill('#sqInput','128');
+    await page.fill('#sqOutput','16');
+    await page.getByRole('button',{name:'预览计划',exact:true}).click();
+    await page.waitForSelector('#suiteExecute');
+    assert.equal(await page.locator('#suitePreview tbody tr').count(),3);
+    assert.equal(await page.locator('#suitePreview .suite-metrics b').nth(1).textContent(),'9');
+    await page.screenshot({path:path.join(output,'desktop-plan.png'),fullPage:true});
+    await page.setViewportSize({width:390,height:844});
+    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Mobile form must fit');
+    await page.screenshot({path:path.join(output,'mobile-plan.png'),fullPage:true});
+    await page.click('#suiteExecute');
+    await page.waitForFunction(()=>location.hash==='#dashboard'&&!localStorage.getItem('suiteJob'),{},{timeout:30000});
+    assert((await page.locator('#workspaceStage option').count())>=3);
+    await page.click('#workspaceEvidence');
+    await page.waitForSelector('#suiteFullReport iframe');
+    const frame=page.frameLocator('#suiteFullReport iframe');
+    await frame.locator('.metric-value').first().waitFor();
+    assert.equal(await frame.locator('.metric').count(),25);
+    assert.equal(await frame.locator('#requests tbody tr').count(),3);
+    await page.evaluate(()=>scrollTo({top:0,behavior:'instant'}));
+    await page.screenshot({path:path.join(output,'mobile-report.png'),fullPage:true});
+    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Mobile report page must fit');
+    const plotted=await frame.locator('canvas').first().evaluate(c=>{
+      const data=c.getContext('2d').getImageData(0,0,c.width,c.height).data;
+      let colored=0;
+      for(let n=0;n<data.length;n+=4) if(data[n+3]&&Math.max(data[n],data[n+1],data[n+2])-Math.min(data[n],data[n+1],data[n+2])>80) colored++;
+      return colored;
+    });
+    assert(plotted>50,'Report must have visible plotted data');
+    const download=page.waitForEvent('download');
+    await frame.locator('#export-csv').click();
+    const file=await download;
+    await file.saveAs(path.join(output,'report.csv'));
+    assert.equal(fs.readFileSync(path.join(output,'report.csv'),'utf8').trim().split('\n').length,4);
+    await page.setViewportSize({width:1440,height:1100});
+    await page.evaluate(()=>scrollTo({top:0,behavior:'instant'}));
+    await page.screenshot({path:path.join(output,'desktop-report.png'),fullPage:true});
+    const summary={ok:true,simulatedRequests:9,stages:3,metrics:25,chartPixels:plotted,errors};
+    assert.deepEqual(errors,[]);
+    console.log(JSON.stringify(summary));
+    fs.writeFileSync(path.join(output,'verification.json'),JSON.stringify(summary,null,2));
+  } finally { await browser.close(); }
+})().catch(e=>{console.error(e);process.exitCode=1;});

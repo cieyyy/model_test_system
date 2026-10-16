@@ -1,0 +1,7 @@
+[Unit]
+Description=Renew Model Test HTTPS certificate
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/model-test-certbot/bin/certbot renew --quiet --deploy-hook "systemctl reload nginx"

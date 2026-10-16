@@ -1,0 +1,15 @@
+{
+  "base_url": "https://YOUR_PROVIDER/v1",
+  "key_env": "MODEL_TEST_API_KEY",
+  "model": "kimi-k3",
+  "duration": 120,
+  "rate_rps": 128,
+  "concurrency": 640,
+  "input_units": 32768,
+  "max_output_tokens": 128,
+  "timeout": 60,
+  "max_requests": 16000,
+  "tpm_basis": "total",
+  "cache_mode": "shared",
+  "min_success_rate": 0.9
+}

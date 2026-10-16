@@ -1,0 +1,171 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AGIAPI Kimi K3 测试报告</title><style>
+  :root {
+    color-scheme: light;
+    --surface-0: #f6f5f2;
+    --surface-1: #fcfcfb;
+    --surface-2: #f0efec;
+    --border:     #e2e1dc;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #8a8880;
+    --series-1: #2a78d6;   /* 实测 */
+    --series-2: #eb6834;   /* 官方 */
+    --seq-450:  #2a78d6;
+    --good:     #0ca30c;
+    --good-text:#0b7a0b;
+    --grid:     #e8e7e2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface-0: #131312;
+      --surface-1: #1a1a19;
+      --surface-2: #242422;
+      --border:     #383835;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #8f8e85;
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --seq-450:  #3987e5;
+      --good:     #0ca30c;
+      --good-text:#3fbf3f;
+      --grid:     #333330;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-0: #131312;
+    --surface-1: #1a1a19;
+    --surface-2: #242422;
+    --border:     #383835;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #8f8e85;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --seq-450:  #3987e5;
+    --good:     #0ca30c;
+    --good-text:#3fbf3f;
+    --grid:     #333330;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--surface-0);
+    color: var(--text-primary);
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    padding: 40px 20px 60px;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; }
+
+  header { margin-bottom: 28px; }
+  .kicker {
+    font-size: 12px; letter-spacing: 2px; color: var(--text-muted);
+    text-transform: uppercase; margin-bottom: 6px;
+  }
+  h1 { font-size: 26px; font-weight: 700; letter-spacing: 0.5px; }
+  .subtitle { color: var(--text-secondary); margin-top: 6px; font-size: 14px; }
+  .meta-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .chip {
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 999px; padding: 3px 12px; font-size: 12.5px; color: var(--text-secondary);
+  }
+
+  .verdict {
+    display: flex; align-items: center; gap: 14px;
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-left: 4px solid var(--good);
+    border-radius: 10px; padding: 16px 20px; margin-bottom: 22px;
+  }
+  .verdict .icon {
+    flex: none; width: 34px; height: 34px; border-radius: 50%;
+    background: var(--good); color: #fff; font-size: 19px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .verdict strong { font-size: 16px; }
+  .verdict p { color: var(--text-secondary); font-size: 13.5px; margin-top: 2px; }
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 30px; }
+  .tile {
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px 18px;
+  }
+  .tile .label { font-size: 12.5px; color: var(--text-muted); }
+  .tile .value { font-size: 24px; font-weight: 700; margin-top: 4px; letter-spacing: 0.3px; }
+  .tile .sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+
+  section { margin-bottom: 34px; }
+  h2 {
+    font-size: 17px; font-weight: 700; margin-bottom: 4px;
+    display: flex; align-items: baseline; gap: 10px;
+  }
+  h2 .en { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+  .section-desc { color: var(--text-secondary); font-size: 13px; margin-bottom: 14px; }
+
+  .card {
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px;
+  }
+
+  .legend { display: flex; gap: 22px; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
+  .legend .item { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text-secondary); }
+  .legend .swatch { width: 14px; height: 14px; border-radius: 4px; }
+
+  svg { display: block; width: 100%; height: auto; }
+  svg text { font-family: inherit; }
+
+  .bar { cursor: default; transition: opacity .12s; }
+  .bar:hover { opacity: .82; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th {
+    text-align: left; font-weight: 600; color: var(--text-secondary);
+    font-size: 12.5px; padding: 8px 10px; border-bottom: 1.5px solid var(--border);
+    white-space: nowrap;
+  }
+  td { padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .t-strong { font-weight: 700; }
+  .t-muted { color: var(--text-muted); font-size: 12.5px; }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 12px; font-weight: 600; white-space: nowrap;
+    color: var(--good-text);
+    background: color-mix(in srgb, var(--good) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--good) 35%, transparent);
+    border-radius: 6px; padding: 2px 9px;
+  }
+  .delta-pos { color: var(--good-text); font-weight: 600; }
+  .delta-neg { color: var(--text-secondary); font-weight: 600; }
+
+  .footnote { font-size: 12.5px; color: var(--text-muted); margin-top: 12px; line-height: 1.7; }
+
+  footer {
+    margin-top: 44px; padding-top: 16px; border-top: 1px solid var(--border);
+    font-size: 12px; color: var(--text-muted);
+    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+  }
+
+  #tooltip {
+    position: fixed; pointer-events: none; z-index: 10;
+    background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 12px; font-size: 12.5px;
+    color: var(--text-primary); box-shadow: 0 4px 14px rgba(0,0,0,.14);
+    opacity: 0; transition: opacity .1s; max-width: 280px;
+  }
+  #tooltip .tt-title { font-weight: 700; margin-bottom: 2px; }
+  #tooltip .tt-row { color: var(--text-secondary); white-space: nowrap; }
+
+  @media (max-width: 640px) {
+    h1 { font-size: 21px; }
+    .card { padding: 14px; }
+  }
+  @media print {
+    body { background: #fff; padding: 10px; }
+    .card, .tile, .verdict { break-inside: avoid; }
+  }
+</style><style>.detail-table{width:100%;border-collapse:collapse;font-size:13px}.detail-table th,.detail-table td{padding:10px;border-bottom:1px solid var(--border);vertical-align:top}.detail-table th{position:sticky;top:0;z-index:2;background:var(--surface-1);white-space:nowrap;text-align:left}.muted{color:var(--text-secondary);font-size:12px;margin-top:4px;white-space:pre-wrap}.badge{display:inline-block;padding:3px 9px;border-radius:6px;background:#e4f5e8;color:#267942;border:1px solid #a9d9b2;font-weight:600}.badge.bad{background:#fff0ed;color:#9d3028;border-color:#edb4aa}.badge.warn{background:#fff8dc;color:#a56a00;border-color:#e6d18e}.table-scroll{overflow:auto;max-height:720px}.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.summary div{padding:14px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);line-height:1.6}.metric-strip{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));margin:18px 0 26px;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface-1)}.metric{padding:16px 18px;border-right:1px solid var(--border)}.metric:last-child{border-right:0}.metric-label{font-size:14px;font-weight:700;color:var(--text-primary);line-height:1.35;white-space:nowrap}.metric-label .metric-en{display:block;font-size:11px;font-weight:600;letter-spacing:.04em;color:var(--text-secondary);text-transform:uppercase;margin-top:4px}.metric-value{font-size:22px;font-weight:700;color:var(--text-primary);margin-top:10px;white-space:nowrap}.metric-note{font-size:11px;color:var(--text-secondary);margin-top:5px}@media(max-width:900px){.metric-strip{grid-template-columns:repeat(3,1fr)}.metric{border-bottom:1px solid var(--border)}}@media(max-width:560px){.summary{grid-template-columns:1fr}.metric-strip{grid-template-columns:repeat(2,1fr)}}</style></head><body><div class="wrap"><header><div class="kicker">API TEST REPORT · AGIAPI KIMI K3</div><h1>AGIAPI Kimi K3 API 测试报告</h1><div class="subtitle">测试地址：https://agiapi.asia/v1；测试日期：2026-09-22；Key 已脱敏。</div></header><div class="verdict"><div class="icon">!</div><div><strong>本次测试部分完成</strong><p>功能接口大部分返回 HTTP 200；1M 上下文和 100MB 请求体失败。性能指标已补采流式 TTFT，但 TPOT/生成速度需以服务端记录复核。</p></div></div><div class="tiles"><div class="tile"><div class="label">当前项目</div><div class="value">21</div><div class="sub">按本批次测试记录</div></div><div class="tile"><div class="label">通过</div><div class="value">14</div><div class="sub">内容与 HTTP 校验通过</div></div><div class="tile"><div class="label">未通过/未达标</div><div class="value">4</div><div class="sub">接口、内容或性能目标未满足</div></div><div class="tile"><div class="label">待补充/部分</div><div class="value">3</div><div class="sub">需流式或复测</div></div></div><section class="metric-strip"><div class="metric"><div class="metric-label">平均首字延迟<span class="metric-en">AVG TTFT (MS)</span></div><div class="metric-value">2873.70</div></div><div class="metric"><div class="metric-label">P99 首字延迟<span class="metric-en">P99 TTFT (MS)</span></div><div class="metric-value">12848.08</div></div><div class="metric"><div class="metric-label">平均每令牌时间<span class="metric-en">AVG TPOT (MS)</span></div><div class="metric-value">0.01</div><div class="metric-note">客户端流式块估算</div></div><div class="metric"><div class="metric-label">P99 每令牌时间<span class="metric-en">P99 TPOT (MS)</span></div><div class="metric-value">0.01</div><div class="metric-note">客户端流式块估算</div></div><div class="metric"><div class="metric-label">生成速度<span class="metric-en">GEN. TOK/S</span></div><div class="metric-value">331-662</div><div class="metric-note">平台使用记录</div></div><div class="metric"><div class="metric-label">成功率<span class="metric-en">SUCCESS RATE</span></div><div class="metric-value">100.0%</div><div class="metric-note">90/90 HTTP 200</div></div></section><section><h2>测试总结 <span class="en">Summary</span></h2><div class="summary"><div><b>功能能力</b><br>基础调用、JSON、工具调用、图片、视频和混合多模态请求成功。</div><div><b>稳定性问题</b><br>连续对话第4、5轮内容校验失败；缓存命中不稳定；1M 上下文 HTTP 504；100MB 请求体 HTTP 413。</div><div><b>性能结论</b><br>90/90 请求成功；TTFT 已采集，TPOT 和客户端生成速度异常，已改以平台使用记录为准。</div></div></section><section><h2>测试项目明细 <span class="en">Detailed Results</span></h2><div class="card"><div class="table-scroll"><table class="detail-table"><thead><tr><th>编号</th><th>测试项目 / 接口</th><th>耗时</th><th>输入 / 输出 Tokens</th><th>HTTP</th><th>状态</th><th>关键响应 / 判定说明</th></tr></thead><tbody><tr><td>01</td><td><b>Chat Completions 基础调用</b><div class="muted">/v1/chat/completions</div></td><td>1.420</td><td>14<br><span class="muted">2</span></td><td>200</td><td><span class="badge ">通过</span></td><td><div>BASIC_OK；HTTP 200</div><div class="muted"></div></td></tr><tr><td>02</td><td><b>推理强度 low/high/max</b><div class="muted">/v1/chat/completions</div></td><td>0.735/1.657</td><td>21<br><span class="muted">1</span></td><td>200</td><td><span class="badge ">通过</span></td><td><div>三档均 HTTP 200；CONTENT=391</div><div class="muted"></div></td></tr><tr><td>03</td><td><b>流式输出完整性</b><div class="muted">/v1/chat/completions</div></td><td>7.576</td><td>14<br><span class="muted">3</span></td><td>200</td><td><span class="badge ">通过</span></td><td><div>STREAM_OK；SSE_DONE=True</div><div class="muted"></div></td></tr><tr><td>04</td><td><b>JSON Object</b><div class="muted">/v1/chat/completions</div></td><td>3.181</td><td>25<br><span class="muted">10</span></td><td>200</td><td><span class="badge ">通过</span></td><td><div>JSON 可解析；HTTP 200</div><div class="muted"></div></td></tr><tr><td>05</td><td><b>JSON Schema</b><div class="muted">/v1/chat/completions</div></td><td>6.220</td><td>25<br><span class="muted">236</span></td><td>200</td><td><span class="badge ">通过</span></td><td><div>符合 JSON Schema；HTTP 200</div><div class="muted"></div></td></tr><tr><td>06</td><td><b>Tool Calling</b><div class="muted">/v1/chat/completions</div></td><td>4.014</td><td>276<br><span class="muted">50</span></td><td>200</td><td><span class="badge ">通过</span></td><td><div>tool_calls=1；HTTP 200</div><div class="muted"></div></td></tr><tr><td>07</td><td><b>工具结果闭环</b><div class="muted">/v1/chat/completions</div></td><td>4.296（两步）</td><td>385<br><span class="muted">76</span></td><td>200</td><td><span class="badge ">通过</span></td><td><div>工具结果回传后最终回答成功</div><div class="muted"></div></td></tr><tr><td>08</td><td><b>并行 Tool Calling</b><div class="muted">/v1/chat/completions</div></td><td>4.811（两步）</td><td>548<br><span class="muted">81</span></td><td>200</td><td><span class="badge ">通过</span></td><td><div>tool_calls=2；最终结果正确</div><div class="muted"></div></td></tr><tr><td>09</td><td><b>Partial Mode</b><div class="muted">/v1/chat/completions</div></td><td>4.611</td><td>67<br><span class="muted">94</span></td><td>200</td><td><span class="badge ">通过</span></td><td><div>返回有效摘要</div><div class="muted"></div></td></tr><tr><td>10</td><td><b>自动缓存 / Cache Read</b><div class="muted">/v1/chat/completions</div></td><td>2.776/7.456</td><td>830<br><span class="muted">173</span></td><td>200</td><td><span class="badge warn">部分通过</span></td><td><div>5轮均 HTTP 200；未稳定命中</div><div class="muted"></div></td></tr><tr><td>11</td><td><b>连续对话</b><div class="muted">/v1/chat/completions</div></td><td>2.528/2.114</td><td>436<br><span class="muted">34</span></td><td>200</td><td><span class="badge bad">未通过</span></td><td><div>前3轮 ACK 正确；第4、5轮返回 CACHE_OK</div><div class="muted"></div></td></tr><tr><td>12</td><td><b>1M上下文边界</b><div class="muted">/v1/chat/completions</div></td><td>62.153</td><td><br><span class="muted"></span></td><td>504</td><td><span class="badge bad">未通过</span></td><td><div>HTTP 504；上游超时</div><div class="muted"></div></td></tr><tr><td>13</td><td><b>图片理解</b><div class="muted">/v1/chat/completions</div></td><td>5.788</td><td><br><span class="muted"></span></td><td>200</td><td><span class="badge ">通过</span></td><td><div>HTTP 200；图片识别成功</div><div class="muted"></div></td></tr><tr><td>14</td><td><b>视频理解</b><div class="muted">/v1/chat/completions</div></td><td>35.376</td><td><br><span class="muted"></span></td><td>200</td><td><span class="badge ">通过</span></td><td><div>HTTP 200；视频理解成功</div><div class="muted"></div></td></tr><tr><td>15</td><td><b>混合图文视频请求</b><div class="muted">/v1/chat/completions</div></td><td>46.059</td><td>4709<br><span class="muted"></span></td><td>200</td><td><span class="badge ">通过</span></td><td><div>HTTP 200；finish=stop</div><div class="muted"></div></td></tr><tr><td>16</td><td><b>100MB请求体</b><div class="muted">/v1/chat/completions</div></td><td>0.594/0.696/0.722/0.698/0.714/0.696</td><td><br><span class="muted"></span></td><td>413</td><td><span class="badge bad">未通过</span></td><td><div>50/70/80/90/95/100MB 全部 HTTP 413</div><div class="muted"></div></td></tr><tr><td>17</td><td><b>常规延迟验收</b><div class="muted">/v1/chat/completions</div></td><td>1.394-13.174</td><td><br><span class="muted"></span></td><td>200</td><td><span class="badge ">未达到目标</span></td><td><div>90/90 HTTP 200；AVG TTFT=2873.70ms；P99 TTFT=12848.08ms；平台缓存命中=100%（1122/1122）；平台流式速度=331-662 token/s；客户端GEN TOK/S原值1776565.13无效</div><div class="muted">TTFT 使用客户端采集；缓存和生成速度以 AGIAPI 使用记录为准。平台记录显示90条请求均命中缓存，服务端流式速度约331-662 token/s。</div></td></tr><tr><td>18</td><td><b>工具模式验收</b><div class="muted">/v1/chat/completions</div></td><td>0.255</td><td><br><span class="muted"></span></td><td>200</td><td><span class="badge ">通过</span></td><td><div>HTTP 200；实际仅执行1请求</div><div class="muted"></div></td></tr><tr><td>19</td><td><b>吞吐压测 200请求</b><div class="muted">/v1/chat/completions</div></td><td>1.175-30.150</td><td><br><span class="muted"></span></td><td>200</td><td><span class="badge ">未达到目标</span></td><td><div>200/200 HTTP 200；TTFT P50=3083.06ms，P90=13205.01ms，P95=22993.79ms，P99=30073.55ms；FINISH 多数为 length</div><div class="muted"></div></td></tr><tr><td>20</td><td><b>长输出</b><div class="muted">/v1/chat/completions</div></td><td>40.278/52.634/60.443</td><td><br><span class="muted">2277/3115/-</span></td><td>504</td><td><span class="badge bad">未通过</span></td><td><div>目标512：HTTP 200、finish=length、核验码0/3；目标1024：HTTP 200、finish=length、核验码0/3；目标1808：HTTP 504</div><div class="muted"></div></td></tr><tr><td>21</td><td><b>工具模式高并发验收</b><div class="muted">/v1/chat/completions</div></td><td>5.551</td><td><br><span class="muted"></span></td><td>200</td><td><span class="badge ">通过</span></td><td><div>HTTP 200；finish=tool_calls；实际仅执行1请求</div><div class="muted"></div></td></tr></tbody></table></div></div></section><footer><span>AGIAPI Kimi K3 API 测试报告 · 2026-09-22</span><span>API Key 未写入页面</span></footer></div></body></html>

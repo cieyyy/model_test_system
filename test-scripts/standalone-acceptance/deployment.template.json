@@ -1,0 +1,12 @@
+{
+  "model": "ORIGINAL_MODEL_AND_REVISION",
+  "served_model": "YOUR_MODEL_ID",
+  "quantization": "fp8",
+  "moe_weight_scheme": "填写实际方案：专家权重精度、FP8格式、per-tensor/per-channel/block粒度、block尺寸、静态/动态scale；共享专家、router、非专家层精度",
+  "checkpoint_sha256": "",
+  "engine_version": "",
+  "evidence_source": "填写部署日志、启动参数、quantization_config与检查点清单的可核验位置，并说明与被测端点对应关系",
+  "evidence_sha256": "",
+  "verified_by": "",
+  "verified_at": ""
+}

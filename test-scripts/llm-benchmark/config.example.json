@@ -1,0 +1,18 @@
+{
+  "name": "DeepSeek 性能测试",
+  "endpoint": "https://api.deepseek.com/v1/chat/completions",
+  "model": "填写实际可用的模型 ID",
+  "api_key_env": "MODEL_TEST_API_KEY",
+  "concurrency": 50,
+  "total_requests": 160,
+  "timeout_seconds": 60,
+  "duration_seconds": 0,
+  "prompt_mode": "generated",
+  "prompt_tokens": 32000,
+  "prompt": "请用中文解释缓存如何改善大语言模型的推理性能。",
+  "max_tokens": 256,
+  "max_tokens_field": "max_tokens",
+  "temperature": null,
+  "include_usage": true,
+  "proxy": ""
+}
