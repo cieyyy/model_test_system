@@ -152,7 +152,7 @@ function renderNav() {
   const icons={dashboard:'activity',overview:'layout-dashboard',providers:'network',models:'boxes',projects:'list-checks',exec:'terminal',suites:'flask-conical',reports:'chart-no-axes-combined',matrix:'grid-2x2',import:'folder-input',settings:'settings-2'};
   const button = ([k, label]) => `<button class="${state.tab === k ? "active" : ""}" onclick="go('${k}')" ${state.tab===k?'aria-current="page"':''}><i data-lucide="${icons[k]}" aria-hidden="true"></i><span>${label}</span></button>`;
   $("#nav").innerHTML = TABS.filter(([k]) => primary.includes(k)).map(button).join('') +
-    `<details ${primary.includes(state.tab) ? '' : 'open'}><summary>管理</summary>${TABS.filter(([k]) => !primary.includes(k)).map(button).join('')}</details>`;
+    `<div class="workspace-nav-group" role="group" aria-label="管理"><div class="workspace-nav-heading">管理</div>${TABS.filter(([k]) => !primary.includes(k)).map(button).join('')}</div>`;
   $('#workspaceLocation').textContent=TABS.find(([k])=>k===state.tab)?.[1]||'压测工作台';
 }
 function go(tab) { clearTimeout(workspacePoll); clearTimeout(suitePoll); state.tab = tab; history.replaceState(null, '', '#'+tab); renderNav(); render(); }

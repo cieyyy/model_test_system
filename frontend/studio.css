@@ -42,11 +42,11 @@ input[type=checkbox] { accent-color:var(--accent); }
 :root[data-theme=light] .btn.primary { color:#fff; }
 :root[data-theme=light] .btn.primary:hover { background:#6d591e; border-color:#6d591e; color:#fff; }
 #nav { border-color:var(--border); padding-bottom:20px; }
-#nav>button,#nav details button { display:flex; align-items:center; gap:11px; color:var(--text-2); min-height:42px; padding:10px 12px; margin-bottom:5px; border-radius:5px; }
+#nav>button,#nav .workspace-nav-group button { display:flex; align-items:center; gap:11px; color:var(--text-2); min-height:42px; padding:10px 12px; margin-bottom:5px; border-radius:5px; }
 #nav svg { width:17px; height:17px; flex:none; }
 #nav button.active { color:var(--accent); background:var(--accent-bg); box-shadow:inset 2px 0 var(--accent); }
 #nav button:hover { background:var(--hover); color:var(--text); }
-#nav summary { padding:10px 12px; color:var(--text-3); }
+#nav .workspace-nav-heading { padding:10px 12px; color:var(--text-3); }
 .workspace-history-heading { margin:23px 10px 11px; font-size:11px; }
 #workspaceHistoryCount { font-family:ui-monospace,monospace; color:var(--accent); }
 .workspace-history-item { border-radius:4px; padding:11px 10px; }
@@ -132,11 +132,9 @@ summary { color:var(--text-2); cursor:pointer; font-size:12px; }
   .workspace-mark { width:31px; height:31px; }
   #workspaceNew { width:auto; margin:0; min-height:35px; align-self:center; }
   #nav { display:flex; padding:0; gap:4px; border:0; }
-  #nav>button { width:auto; min-height:36px; padding:8px; margin:0; font-size:12px; gap:6px; }
+  #nav>button,#nav .workspace-nav-group button { display:inline-flex; width:auto; min-height:36px; padding:8px; margin:0; font-size:12px; gap:6px; }
   #nav svg { width:15px; height:15px; }
-  #nav details { margin:0; }
-  #nav summary { padding:8px; }
-  #nav details[open] button { display:inline-flex; width:auto; font-size:12px; }
+  #nav .workspace-nav-heading { padding:8px; }
   #workspaceHistory { max-height:57px; gap:7px; }
   .workspace-history-item { padding:7px 8px; background:var(--surface); }
   .workspace-history-heading,.workspace-sidebar-footer { display:none; }
