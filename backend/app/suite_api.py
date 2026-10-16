@@ -23,7 +23,7 @@ router = APIRouter(prefix="/api/suites", tags=["测试套件"])
 class SuiteRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     suite_id: str = "benchmark"
-    suite_ids: list[str] = Field(default_factory=list, max_length=22)
+    suite_ids: list[str] = Field(default_factory=list, max_length=128)
     suite_parameters: dict[str, dict] = Field(default_factory=dict)
     continue_on_error: bool = True
     cooldown_seconds: int = Field(default=70, ge=0, le=600)

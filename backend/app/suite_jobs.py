@@ -175,6 +175,9 @@ class SuiteJob:
         env = {k: v for k, v in os.environ.items() if not k.startswith("ACCEPTANCE_") and not any(s in k.upper() for s in ("KEY", "TOKEN", "SECRET", "PASSWORD"))}
         env.update({KEY_ENV: self.key, "API_KEY_ENV": KEY_ENV, "API_BASE": plan["endpoint"].removesuffix("/chat/completions"),
                     "MODEL": plan["model"], "TEST_RESULT_ROOT": str(output), "PYTHONUNBUFFERED": "1"})
+        if plan["suite_id"] in ("unified_api", "rate_cache_metrics"):
+            save_json(directory / "source-config.json", dict(base_url=env["API_BASE"], models=[plan["model"]],
+                      api_key_env=KEY_ENV, timeout_seconds=plan["parameters"]["timeout"]))
         with (directory / "script_output.log").open("w", encoding="utf-8") as logfile:
             with self.lock:
                 if self.stop.is_set():

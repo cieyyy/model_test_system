@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>模型测试平台 · 套件与压测报告</title>
+<title>模型测试平台 · 测试报告</title>
 <script>try{document.documentElement.dataset.theme=localStorage.getItem('platformTheme')==='light'?'light':'dark';}catch{document.documentElement.dataset.theme='dark';}</script>
 <link rel="stylesheet" href="/static/suites.css">
 <style>
@@ -91,8 +91,8 @@
     .field input, .field select, .field textarea { min-width: 120px; }
   }
 </style>
-<link rel="stylesheet" href="/static/workspace.css?v=20261016-history2">
-<link rel="stylesheet" href="/static/studio.css?v=20261016-history2">
+<link rel="stylesheet" href="/static/workspace.css?v=20261016-reports">
+<link rel="stylesheet" href="/static/studio.css?v=20261016-reports">
 </head>
 <body>
 <aside id="platformSidebar">
@@ -103,8 +103,8 @@
 </aside>
 <div id="platformWorkspace">
 <header>
-  <div class="studio-breadcrumb"><span>工作空间</span><i data-lucide="chevron-right" aria-hidden="true"></i><h1 id="workspaceLocation">压测工作台</h1></div>
-  <span class="phase">测试套件 · 压测报告</span>
+  <div class="studio-breadcrumb"><span>工作空间</span><i data-lucide="chevron-right" aria-hidden="true"></i><h1 id="workspaceLocation">压测展示台</h1></div>
+  <span class="phase">模型测试 · 测试报告</span>
   <div class="studio-header-actions"><span class="pw-state" id="pwState"></span><button class="studio-icon-button" id="themeToggle" type="button" onclick="studioToggleTheme()" title="切换到浅色" aria-label="切换到浅色"><i data-lucide="sun" aria-hidden="true"></i></button><button class="studio-icon-button" type="button" onclick="go('settings')" title="设置" aria-label="设置"><i data-lucide="settings-2" aria-hidden="true"></i></button></div>
 </header>
 <main id="main"></main>
@@ -114,10 +114,10 @@
 <div class="toast" id="toast"></div>
 
 <script src="/static/vendor/lucide.min.js"></script>
-<script src="/static/studio.js?v=20261016-history"></script>
-<script src="/static/suites.js?v=20261016-history"></script>
-<script src="/static/reports.js"></script>
-<script src="/static/workspace.js?v=20261016-history2"></script>
+<script src="/static/studio.js?v=20261016-reports"></script>
+<script src="/static/suites.js?v=20261016-reports"></script>
+<script src="/static/reports.js?v=20261016-reports"></script>
+<script src="/static/workspace.js?v=20261016-reports"></script>
 <script>
 const API = "/api";
 let state = { tab: location.hash.slice(1) || "dashboard", providers: [], models: [], projects: [], stats: {}, legacyRoot: "" };
@@ -139,20 +139,20 @@ function closeModal() { $("#mask").classList.remove("show"); }
 $("#mask").addEventListener("click", (e) => { if (e.target.id === "mask") closeModal(); });
 
 const TABS = [
-  ["dashboard", "压测工作台"],
+  ["dashboard", "压测展示台"],
   ["history", "测试记录"],
   ["overview", "总览"], ["providers", "中转站"], ["models", "模型"],
-  ["projects", "测试项目"], ["exec", "执行测试"], ["suites", "测试套件"],
-  ["reports", "压测报告"], ["matrix", "兼容性矩阵"], ["import", "导入旧资料"], ["settings", "设置"],
+  ["projects", "测试项目"], ["exec", "执行测试"], ["suites", "新建测试"],
+  ["reports", "测试报告"], ["matrix", "兼容性矩阵"], ["import", "导入旧资料"], ["settings", "设置"],
 ];
 
 function renderNav() {
-  const primary = ['dashboard', 'history', 'suites', 'reports'];
+  const primary = ['dashboard', 'history', 'reports'];
   const icons={dashboard:'activity',history:'history',overview:'layout-dashboard',providers:'network',models:'boxes',projects:'list-checks',exec:'terminal',suites:'flask-conical',reports:'chart-no-axes-combined',matrix:'grid-2x2',import:'folder-input',settings:'settings-2'};
   const button = ([k, label]) => `<button class="${state.tab === k ? "active" : ""}" onclick="go('${k}')" ${state.tab===k?'aria-current="page"':''}><i data-lucide="${icons[k]}" aria-hidden="true"></i><span>${label}</span></button>`;
   $("#nav").innerHTML = TABS.filter(([k]) => primary.includes(k)).map(button).join('') +
-    `<div class="workspace-nav-group" role="group" aria-label="管理"><div class="workspace-nav-heading">管理</div>${TABS.filter(([k]) => !primary.includes(k)).map(button).join('')}</div>`;
-  $('#workspaceLocation').textContent=TABS.find(([k])=>k===state.tab)?.[1]||'压测工作台';
+    `<div class="workspace-nav-group" role="group" aria-label="管理"><div class="workspace-nav-heading">管理</div>${TABS.filter(([k]) => !primary.includes(k) && k !== 'suites').map(button).join('')}</div>`;
+  $('#workspaceLocation').textContent=TABS.find(([k])=>k===state.tab)?.[1]||'压测展示台';
 }
 function go(tab) { clearTimeout(workspacePoll); clearTimeout(suitePoll); state.tab = tab; history.replaceState(null, '', '#'+tab); renderNav(); render(); }
 window.go = go;

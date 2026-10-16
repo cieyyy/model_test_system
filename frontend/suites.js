@@ -18,7 +18,7 @@ async function renderSuites() {
   clearTimeout(suitePoll);
   suiteGeneration++;
   suitePlan=null;
-  $('#main').innerHTML=studioHeading('suites')+'<div class="suite-status">正在读取套件目录…</div>';
+  $('#main').innerHTML=studioHeading('suites')+'<div class="suite-status">正在读取测试项目…</div>';
   try {
     suiteCatalog=await api('/suites');
     suiteEditing=null;
@@ -34,7 +34,7 @@ async function renderSuites() {
         </div>
         <div id="suiteSelection" hidden></div>
         <section id="suiteProjectConfig">
-        <div class="suite-toolbar"><div class="field suite-config-picker"><label id="suitePickerLabel" for="sqSuite">选择测试项目</label><select id="sqSuite" onchange="suiteParameters()">${suiteCatalog.suites.map(s=>`<option value="${esc(s.id)}" ${s.available?'':'disabled'}>${esc(s.name)}${s.available?'':' · 源文件缺失'}</option>`).join('')}</select></div><button type="button" class="btn small" onclick="suiteReset()">恢复本机默认值</button><button type="button" id="suiteCloseConfig" class="btn small" hidden onclick="suiteRemember();document.getElementById('suiteProjectConfig').hidden=true">收起</button></div>
+        <div class="suite-toolbar"><div class="field suite-config-picker"><label id="suitePickerLabel" for="sqSuite">选择测试项目</label><select id="sqSuite" onchange="suiteParameters()">${suiteCatalog.suites.map(s=>`<option value="${esc(s.id)}" ${s.id==='basic'?'selected':''} ${s.available?'':'disabled'}>${esc(s.name)}${s.available?'':' · 源文件缺失'}</option>`).join('')}</select></div><button type="button" class="btn small" onclick="suiteReset()">恢复本机默认值</button><button type="button" id="suiteCloseConfig" class="btn small" hidden onclick="suiteRemember();document.getElementById('suiteProjectConfig').hidden=true">收起</button></div>
         <div class="checkline"><input id="sqDemo" type="checkbox" onchange="suiteDemoChanged()"><label for="sqDemo">本地模拟（不请求模型）</label></div>
         <div id="suiteParameters"></div>
         </section>
@@ -205,34 +205,60 @@ async function suiteWatch(id,generation) {
   } catch(e) { suiteError(e); }
 }
 async function suiteCancel(id) { try {await suitePost('/jobs/'+id+'/cancel');toast('已请求取消');} catch(e) {suiteError(e);} }
+let suiteReportRuns=[];
+const suiteCategory = id => ['benchmark','fixed_rate','tpm_benchmark','stream_metrics','ttft_long_context','latency','text_peak','rate_cache_metrics'].includes(id)?'性能与限流':['api_features','video_understanding','mixed_vision','body_100mb'].includes(id)?'多模态与媒体':['long_conversation','kvv_rounds','long_output','cache','context','stability'].includes(id)?'上下文与稳定性':['acceptance','az_probe'].includes(id)?'验收与渠道':'功能与协议';
 async function renderSuiteReports() {
   clearTimeout(suitePoll);
   suiteGeneration++;
-  $('#main').innerHTML=studioHeading('reports')+'<div id="suiteError" class="suite-error"></div><div id="editableReportList"></div><div id="suiteReportList"></div><section id="reportEditor"></section><section id="suiteReport"></section>';
+  $('#main').innerHTML=studioHeading('reports')+'<div id="suiteError" class="suite-error"></div><div id="suiteReportList"></div><div id="editableReportList"></div><section id="reportEditor"></section><section id="suiteReport"></section>';
   try {
-    const [runs,legacy]=await Promise.all([api('/suites/runs'),api('/suites/legacy-reports')]);
+    const [runs,legacy,catalog]=await Promise.all([api('/suites/runs'),api('/suites/legacy-reports'),api('/suites')]);
     if(state.tab!=='reports') return;
+    suiteReportRuns=runs;
+    const groups=[...new Set(catalog.suites.map(s=>suiteCategory(s.id)))];
+    $('#suiteReportList').innerHTML=`<div class="suite-toolbar"><button class="btn primary" onclick="go('suites')">新建测试</button><button class="btn" onclick="renderSuiteReports()">刷新报告</button><span class="suite-status">${catalog.suites.length} 类项目 · 最近 ${runs.length} 次运行</span></div>
+      <div class="suite-metrics">${groups.map(group=>`<div><b>${runs.filter(r=>suiteCategory(r.suite_id)===group).length}</b><span>${group}</span></div>`).join('')}</div>
+      <div class="suite-form"><div class="field"><label for="reportCategory">测试分类</label><select id="reportCategory" onchange="suiteReportRecords()"><option value="">全部测试项目</option>${groups.map(g=>`<option>${g}</option>`).join('')}</select></div><div class="field"><label for="reportRunSearch">搜索测试结果</label><input id="reportRunSearch" type="search" placeholder="项目、模型或运行编号" oninput="suiteReportRecords()"></div></div>
+      <div id="suiteRunRecords"></div>
+      ${legacy.length?`<section class="suite-section"><h3>历史压测报告</h3><div class="suite-links">${legacy.map(r=>`<button class="btn small" onclick="suiteImport('${esc(r.id)}')">${esc(r.model)} · ${esc(r.id)}</button>`).join('')}</div></section>`:''}`;
+    suiteReportRecords();
     await renderEditableReports();
-    $('#suiteReportList').innerHTML=`<div class="suite-toolbar"><button class="btn primary" onclick="go('suites')">新建测试</button><button class="btn" onclick="renderSuiteReports()">刷新报告</button><span class="suite-status">最近 ${runs.length} 次运行</span></div>
-      ${runs.length?`<div class="suite-preview"><table><thead><tr><th>运行 / 时间</th><th>套件 / 模型</th><th>状态</th><th>成功 / 完成</th><th></th></tr></thead><tbody>${runs.map(r=>`<tr><td>#${r.id} · ${esc(r.started_at.replace('T',' ').slice(0,19))}</td><td>${esc(r.name)}${r.demo?' <span class="tag warn">模拟</span>':''}<br>${esc(r.model)}</td><td>${suiteStatus(r.status)}</td><td>${suiteNumber(r.summary?.success)} / ${suiteNumber(r.summary?.attempted)}</td><td><button class="btn small" onclick="suiteShowReport(${r.id})">查看报告</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">尚无套件运行记录</div>'}
-      <details class="suite-section"><summary>旧目录压测报告（${legacy.length}）</summary>${legacy.length?`<div class="suite-preview"><table><thead><tr><th>原运行 ID</th><th>模型</th><th>状态</th><th>操作</th></tr></thead><tbody>${legacy.map(r=>`<tr><td>${esc(r.id)}${r.demo?' · 模拟':''}</td><td>${esc(r.model)}</td><td>${suiteStatus(r.status)}</td><td><button class="btn small" onclick="suiteImport('${esc(r.id)}')">导入查看</button></td></tr>`).join('')}</tbody></table></div>`:'<p class="suite-note">没有可识别的旧版 benchmark 报告</p>'}</details>`;
   } catch(e) {suiteError(e);}
+}
+function suiteReportRecords() {
+  const group=$('#reportCategory').value,query=$('#reportRunSearch').value.trim().toLowerCase();
+  const runs=suiteReportRuns.filter(r=>(!group||suiteCategory(r.suite_id)===group)&&(!query||`#${r.id} ${r.name} ${r.model}`.toLowerCase().includes(query)));
+  $('#suiteRunRecords').innerHTML=runs.length?`<div class="suite-preview"><table><thead><tr><th>运行 / 时间</th><th>测试项目 / 模型</th><th>分类</th><th>执行状态</th><th>源脚本结果</th><th></th></tr></thead><tbody>${runs.map(r=>`<tr><td>#${r.id}<br>${esc(r.started_at.replace('T',' ').slice(0,19))}</td><td>${esc(r.name)}${r.demo?' <span class="tag warn">模拟</span>':''}<br>${esc(r.model)}</td><td>${suiteCategory(r.suite_id)}</td><td>${suiteStatus(r.status)}</td><td>${suiteRunOutcome(r)}</td><td><button class="btn small" onclick="suiteShowReport(${r.id})">查看报告</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">暂无对应测试结果</div>';
+}
+function suiteRunOutcome(r) {
+  if(r.suite_id==='benchmark') return `${suiteNumber(r.summary?.success)} / ${suiteNumber(r.summary?.attempted)} 请求成功`;
+  const counts={};let total=0;
+  for(const table of r.source_tables||[]) {total+=table.rows;for(const [k,v] of Object.entries(table.result_counts||{}))counts[k]=(counts[k]||0)+v;}
+  return total?`${total} 条记录 · 通过 ${(counts.pass||0)+(counts.passed||0)} · 未通过 ${(counts.fail||0)+(counts.failed||0)}`:'尚无用例断言';
 }
 async function suiteOpenReport(id) { state.tab='reports'; history.replaceState(null,'','#reports'); renderNav(); await refreshData(); await renderSuiteReports(); await suiteShowReport(id); }
 async function suiteShowReport(id) {
   try {
     const r=await api('/suites/runs/'+id);
-    const html=r.files.find(f=>f.path.endsWith('/report.html'));
+    const html=r.files.find(f=>f.path==='report.html'||f.path.endsWith('/report.html'));
     const fileUrl=p=>'/api/suites/runs/'+id+'/files/'+p.split('/').map(encodeURIComponent).join('/');
     $('#suiteReport').innerHTML=`<div class="suite-section"><div class="suite-toolbar"><h2>#${r.id} · ${esc(r.name)} ${r.demo?'<span class="tag warn">模拟数据</span>':''}</h2><button class="btn primary" onclick="reportFromRuns([${r.id}])">自定义报告</button><button class="btn" onclick="reportFromJob('${esc(r.job_id)}')">任务汇总报告</button></div><div class="suite-status">${esc(r.model)} · ${suiteStatus(r.status)} · ${esc(r.verdict)}</div>
-      ${r.suite_id!=='benchmark'&&r.summary?suiteMetrics(r.summary):''}
+      ${r.suite_id!=='benchmark'?suiteSourceMetrics(r):''}
       ${r.suite_id==='benchmark'?'<p class="suite-note">TTFT：首个正文或思考片段；TPM：全程折算；百分位：线性插值。未知 Usage 显示为空，不按 0 计算。</p>':''}
-      ${r.suite_id==='benchmark'?'<div id="suiteFullReport"></div>':html?`<iframe class="suite-report" title="压测完整报告" sandbox="allow-scripts allow-downloads allow-modals" src="${fileUrl(html.path)}"></iframe>`:''}
-      ${r.source_summaries?.length?`<details open><summary>源脚本报告（保留原结论）</summary><pre class="mono" style="max-height:500px">${esc(JSON.stringify(r.source_summaries,null,2))}</pre></details>`:''}
-      ${r.source_tables?.length?`<details open><summary>逐请求表格与原始判定</summary><pre class="mono">${esc(JSON.stringify(r.source_tables,null,2))}</pre></details>`:''}
+      <div id="suiteFullReport"></div>
+      ${html?`<p><a class="btn small" href="${fileUrl(html.path)}" target="_blank" rel="noopener">源脚本 HTML 报告</a></p>`:''}
       <details><summary>配置与全部证据（${r.files.length}）</summary><pre class="mono">${esc(JSON.stringify(r.config,null,2))}</pre><div class="suite-links">${r.files.map(f=>`<a href="${fileUrl(f.path)}" target="_blank" rel="noopener">${esc(f.path)} (${suiteNumber(f.bytes)} B)</a>`).join('')}</div></details></div>`;
     if(r.suite_id==='benchmark') await workspaceBenchmark($('#suiteFullReport'),r.id,false);
+    else if(!['running','queued'].includes(r.status)) {
+      const report=await reportApi('',{run_ids:[r.id]});
+      $('#suiteFullReport').innerHTML=`<iframe class="suite-report" title="模型测试 HTML 报告" sandbox="allow-scripts" src="/api/suite-reports/${report.id}/view"></iframe>`;
+    } else $('#suiteFullReport').innerHTML='<p class="suite-note">测试执行中，结束后生成测试报告。</p>';
     $('#suiteReport').scrollIntoView({behavior:'smooth',block:'start'});
   } catch(e) {suiteError(e);}
+}
+function suiteSourceMetrics(r) {
+  const counts={};let total=0;
+  for(const table of r.source_tables||[]) {total+=table.rows;for(const [key,value] of Object.entries(table.result_counts||{}))counts[key]=(counts[key]||0)+value;}
+  return `<div class="suite-metrics">${[['已归档记录',total],['源脚本通过',(counts.pass||0)+(counts.passed||0)],['源脚本未通过',(counts.fail||0)+(counts.failed||0)],['人工复核',counts.manual_review||0]].map(([label,value])=>`<div><b>${suiteNumber(value)}</b><span>${label}</span></div>`).join('')}</div>`;
 }
 async function suiteImport(id) {try {const r=await suitePost('/legacy-reports/'+id+'/import');await renderSuiteReports();await suiteShowReport(r.run_id);toast(r.imported?'已归档，原文件保持不变':'该版本已导入');} catch(e) {suiteError(e);} }

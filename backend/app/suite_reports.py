@@ -3,11 +3,9 @@ from __future__ import annotations
 
 import csv
 import hashlib
-import html
 import io
 import json
 import math
-import os
 import re
 import threading
 from pathlib import Path
@@ -21,6 +19,7 @@ from sqlalchemy import select
 
 from .db import Run, SessionLocal, SuiteReport, SuiteReportVersion
 from .suite_jobs import SUITE_RUNS, run_dict
+from .report_results import detail, observed, overview, number
 
 router = APIRouter(prefix="/api/suite-reports", tags=["可编辑报告"])
 LOCK = threading.RLock()
@@ -68,12 +67,16 @@ def short(value):
 
 
 def flat_metrics(data, prefix="", depth=0):
-    if depth > 5 or not isinstance(data, dict):
+    if depth > 5:
+        return []
+    if isinstance(data, list):
+        return [row for index, item in enumerate(data[:100]) for row in flat_metrics(item, f"{prefix}[{index}]", depth + 1)]
+    if not isinstance(data, dict):
         return []
     rows = []
     for key, value in data.items():
         name = f"{prefix}.{key}" if prefix else str(key)
-        if isinstance(value, dict):
+        if isinstance(value, (dict, list)):
             rows.extend(flat_metrics(value, name, depth + 1))
         elif isinstance(value, (int, float, bool, str)) and value is not None:
             if isinstance(value, float) and not math.isfinite(value):
@@ -83,7 +86,7 @@ def flat_metrics(data, prefix="", depth=0):
 
 
 def source_snapshot(runs):
-    rows, charts, sources = [], [], []
+    rows, charts, sources, details = [], [], [], []
     truncated = False
     for run in runs:
         record = run_dict(run)
@@ -92,7 +95,9 @@ def source_snapshot(runs):
             raise ValueError("证据目录不在归档范围")
         manifest = root / "manifest.json" if root else None
         sources.append(dict(run_id=run.id, name=run.project_name, provider=run.provider_name, model=run.model_name,
-                            status=run.status, demo=record.get("demo", False), source_sha256=record.get("source_sha256", ""),
+                            status=run.status, demo=record.get("demo", False), suite_id=record.get("suite_id", ""),
+                            config=record.get("config", {}), files=[table["file"] for table in record.get("source_tables", [])],
+                            source_sha256=record.get("source_sha256", ""),
                             manifest_sha256=hashlib.sha256(manifest.read_bytes()).hexdigest() if manifest and manifest.is_file() else ""))
 
         def add(case, observed, conclusion="待复核", note="", suffix=""):
@@ -112,6 +117,7 @@ def source_snapshot(runs):
         if not root or not root.is_dir():
             continue
         # Preserve source assertions verbatim. HTTP success and process exit are not acceptance.
+        samples = []
         for table in record.get("source_tables", []):
             path = (root / table["file"]).resolve()
             if not path.is_relative_to(root) or not path.is_file() or path.stat().st_size > 50000000:
@@ -121,11 +127,14 @@ def source_snapshot(runs):
                     if index >= 100 or len(rows) >= 1900:
                         truncated = True
                         break
-                    original = row.get("result") or row.get("status") or "未提供业务断言"
-                    conclusion = {"pass": "源脚本通过", "passed": "源脚本通过", "fail": "源脚本未通过", "failed": "源脚本未通过",
-                                  "skip": "源脚本跳过", "skipped": "源脚本跳过", "manual_review": "待人工复核"}.get(str(original).lower(), "待复核")
-                    add(row.get("case") or row.get("case_id") or f"请求 {index+1}", row, conclusion,
-                        f"源断言：{original}；{table['file']}；行 {index+2}")
+                    item = detail(row, run.project_name, f"{table['file']}；行 {index+2}", run.id)
+                    details.append(item)
+                    add(item["case"], observed(item), item["outcome"],
+                        f"源断言：{item['original']}；{item['evidence']}")
+                    samples.append([number(item[k]) for k in ("ttft_ms", "tpot_ms", "elapsed_ms")])
+        if samples and any(v is not None for sample in samples for v in sample):
+            charts.append(dict(name=f"#{run.id} {run.project_name}", samples=samples[:500],
+                               demo=record.get("demo", False), labels=["源脚本 TTFT", "TPOT", "请求总耗时"]))
         if record.get("suite_id") == "benchmark":
             relative = record.get("report_dir")
             candidates = [root / relative / "report.json"] if relative else list(root.glob("*/report.json"))
@@ -139,7 +148,7 @@ def source_snapshot(runs):
                     break
     if truncated:
         rows.append(dict(id="truncated", project="归档说明", case="明细显示上限", observed="报告最多收集 1900 行，每张 CSV 前 100 行。完整明细见原始证据。", conclusion="", note="", visible=True))
-    return dict(runs=sources, rows=rows, charts=charts, truncated=truncated)
+    return dict(runs=sources, rows=rows, charts=charts, details=details, overview=overview(details), truncated=truncated)
 
 
 def generate_report(run_ids=None, job_id=""):
@@ -244,35 +253,17 @@ def save_version(rid: int, request: ReportSave):
 
 
 def report_html(content, source):
-    c = content.model_dump()
-    e = lambda v: html.escape(str(v), quote=True)
-    original = {r["id"]: r for r in source["rows"]}
-    rows = []
-    for row in c["rows"]:
-        if not row["visible"]:
-            continue
-        changed = row["id"] not in original or any(row[k] != original[row["id"]][k] for k in COLUMNS)
-        cells = "".join(f"<td>{e(row[k])}</td>" for k in c["columns"])
-        rows.append(f'<tr class="{"edited" if changed else ""}">{cells}</tr>')
-    table = '<div class="table-wrap"><table><thead><tr>' + ''.join(f'<th>{e(COLUMNS[k])}</th>' for k in c["columns"]) + '</tr></thead><tbody>' + ''.join(rows) + '</tbody></table></div>'
-    parts = []
-    if "summary" in c["sections"]:
-        parts.append(f'<section><h2>测试结论</h2><p class="prose">{e(c["summary"])}</p></section>')
-    if "results" in c["sections"]:
-        parts.append(f'<section><h2>测试结果</h2>{table}<p class="muted">绿色左线标记人工编辑或新增行；原始记录在证据章节中可追溯。</p></section>')
-    if "curves" in c["sections"]:
-        if source["charts"]:
-            parts.append('<section><h2>请求指标曲线</h2><p class="muted">TTFT / TPOT / 端到端延迟，单位 ms；各运行最多展示前 500 个样本。</p>' + ''.join(f'<h3>{e(ch["name"])}{" · 模拟数据" if ch["demo"] else ""}</h3><canvas width="1000" height="280" aria-label="请求延迟曲线"></canvas>' for ch in source["charts"]) + '</section>')
-        else:
-            parts.append('<section><h2>请求指标曲线</h2><p>所选项目没有流式压测曲线，请查看源脚本报告中的专项指标。</p></section>')
-    if "evidence" in c["sections"]:
-        platform_url = e(os.environ.get("MT_PUBLIC_URL", "").rstrip("/") + "/#reports")
-        parts.append('<section><h2>原始证据</h2>' + ''.join(f'<p>#{r["run_id"]} {e(r["name"])} · {e(r["status"])}{" · 模拟数据" if r["demo"] else ""}<br><a href="{platform_url}">平台运行 #{r["run_id"]}</a><br><small>源脚本 SHA256：{e(r["source_sha256"])}<br>证据清单 SHA256：{e(r["manifest_sha256"])}</small></p>' for r in source["runs"]) + '</section>')
-    data = json.dumps(source["charts"], ensure_ascii=False, allow_nan=False).replace('<', '\\u003c')
-    return f'''<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{e(c["title"])}</title>
-<style>*{{box-sizing:border-box;letter-spacing:0}}body{{margin:0;color:#202a33;background:white;font:14px/1.65 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;padding:28px}}main{{max-width:1160px;margin:auto}}h1{{font-size:26px;margin:0;color:{c["accent"]};overflow-wrap:anywhere}}h2{{font-size:18px;border-bottom:1px solid #dce3e7;padding-bottom:8px}}h3{{font-size:14px}}section{{margin:28px 0}}p{{overflow-wrap:anywhere}}.muted,small{{color:#63717e}}small{{overflow-wrap:anywhere}}.prose{{white-space:pre-wrap}}.table-wrap{{overflow:auto}}table{{width:100%;border-collapse:collapse;table-layout:fixed}}th,td{{padding:{"7px" if c["template"] == "compact" else "12px"};border-bottom:1px solid #e1e6eb;vertical-align:top;text-align:left;overflow-wrap:anywhere;white-space:pre-wrap}}th{{background:#f6f8fa}}tr.edited{{border-left:3px solid {c["accent"]}}}canvas{{display:block;width:100%;height:280px}}a{{color:{c["accent"]}}}@media(max-width:600px){{body{{padding:16px}}h1{{font-size:22px}}table{{min-width:660px}}}}@media print{{body{{padding:0}}section{{break-inside:avoid}}}}</style>
-<main><header><small>{"验收报告" if c["template"] == "acceptance" else "模型测试"}</small><h1>{e(c["title"])}</h1><p class="muted">{e(c["subtitle"])}</p></header>{''.join(parts)}</main>
-<script>const charts={data};document.querySelectorAll('canvas').forEach((c,i)=>{{const x=c.getContext('2d'),s=charts[i].samples,colors=['#087f63','#e38a32','#397bcd'];const nums=s.flat().filter(v=>typeof v==='number'&&Number.isFinite(v)&&v>=0);let max=Math.max(1,...nums);x.font='12px sans-serif';for(let k=0;k<5;k++){{let y=25+k*54;x.strokeStyle='#e1e6eb';x.beginPath();x.moveTo(65,y);x.lineTo(980,y);x.stroke();x.fillStyle='#63717e';x.fillText(Math.round(max*(1-k/4)),5,y+4)}}colors.forEach((color,j)=>{{x.strokeStyle=color;x.lineWidth=2;x.beginPath();let gap=true;s.forEach((row,n)=>{{let v=row[j];if(typeof v!=='number'||!Number.isFinite(v)){{gap=true;return}}let px=65+n/Math.max(1,s.length-1)*915,py=241-v/max*216;if(gap)x.moveTo(px,py);else x.lineTo(px,py);x.fillStyle=color;x.fillRect(px-1,py-1,3,3);gap=false}});x.stroke();x.fillStyle=color;x.fillText(['TTFT','TPOT','端到端延迟'][j],65+j*180,270)}})}});</script></html>'''
+    from .report_layout import render
+    return render(content, source)
+
+
+@router.get("/{rid}/view", response_class=HTMLResponse)
+def view_report(rid: int, version: int | None = None):
+    with SessionLocal() as db:
+        report = get_report(db, rid)
+        current = report_version(db, rid, version)
+        return HTMLResponse(report_html(ReportContent.model_validate_json(current.content_json), json.loads(report.source_json)),
+                            headers={"Content-Security-Policy": "sandbox allow-scripts"})
 
 
 @router.post("/{rid}/preview", response_class=HTMLResponse)

@@ -109,6 +109,37 @@ class SuiteTests(unittest.TestCase):
             time.sleep(.03)
         self.fail("Job did not terminate")
 
+    def test_source_assertions_and_missing_metrics(self):
+        from app.report_results import detail, overview, observed
+        passed = detail(dict(case="tools", result="pass", http_status="200", ttft_ms="0", input_tokens="0"), "工具", "results.csv", 1)
+        unknown = detail(dict(case="http-only", http_status="200", elapsed_ms="20"), "功能", "results.csv", 1)
+        failed = detail(dict(case="reasoning", result="fail", http_status="200"), "功能", "results.csv", 1)
+        self.assertEqual((passed["outcome"], unknown["outcome"], failed["outcome"]), ("通过", "待复核", "未通过"))
+        stats = overview([passed, unknown, failed])
+        self.assertEqual((stats["passed"], stats["failed"], stats["review"]), (1, 1, 1))
+        self.assertEqual(stats["ttft_ms"], 0)
+        self.assertIsNone(stats["tpot_ms"])
+        self.assertIn("TTFT", observed(passed))
+
+    def test_unified_api_and_rate_metrics_execute_and_report(self):
+        for sid, parameters in [("unified_api", dict(cases="chat_sse", max_requests=1)),
+                                ("rate_cache_metrics", dict(metrics="ttft,tpot", samples=1, max_requests=1))]:
+            req = self.request()
+            req.update(suite_id=sid, parameters=parameters)
+            job = self.wait(self.execute(req)["job_id"])
+            self.assertEqual(job["status"], "completed", job)
+            record = self.client.get(f'/api/suites/runs/{job["runs"][0]["id"]}').json()
+            self.assertEqual(record["source_tables"][0]["rows"], 1)
+            report = self.client.get(f'/api/suite-reports/{job["report_id"]}').json()
+            self.assertEqual(report["source"]["overview"]["total"], 1)
+            self.assertTrue(report["source"]["charts"])
+            page = self.client.get(f'/api/suite-reports/{job["report_id"]}/view')
+            self.assertEqual(page.status_code, 200)
+            self.assertNotIn("attachment", page.headers.get("content-disposition", ""))
+            self.assertIn("测试项目明细", page.text)
+            self.assertIn("sandbox allow-scripts", page.headers["content-security-policy"])
+            self.assertNotIn(KEY, page.text)
+
     def test_preview_combinations_and_no_records(self):
         before = len(self.client.get("/api/suites/runs").json())
         req = self.request()

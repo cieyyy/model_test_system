@@ -115,10 +115,28 @@ REGISTRY = {
         note="响应头指纹仅作渠道观测，不能证明后台供应链。"),
 }
 
+REGISTRY.update({
+    "unified_api": dict(name="指令遵循 / 自纠错 / API 完整矩阵", entry="unified-api/model_eval.py", kind="script", output=False,
+        fields={"cases": text("chat,responses,instruction,self_correct,json_object,json_schema,function,parallel_tools,chat_sse,responses_sse,conversation,cache,context,concurrency", "用例 IDs"),
+                "max_requests": number(40, "请求硬上限"), "rounds": number(5, "对话 / 缓存轮数", 1, 200),
+                "concurrency": number(3, "并发数", 1, 20), "context_chars": number(12000, "上下文字符数", 256, 120000), "timeout": TIMEOUT},
+        note="来自统一模型API测试/model_eval.py；TTFT 为首个非空 SSE 行或非流式首字节，非首个正文 Token。保留原断言。"),
+    "rate_cache_metrics": dict(name="RPM 限流阶梯 / 缓存指标", entry="unified-api/performance_metrics.py", kind="script", output=False,
+        fields={"metrics": text("ttft,tpot,tpm,rpm,cache", "指标 IDs"), "samples": number(3, "流式样本数", 1, 20),
+                "output_tokens": number(256, "最大输出 Token", 1, 4096), "cache_rounds": number(5, "缓存轮数", 2, 100),
+                "cache_prefix_chars": number(12000, "缓存前缀字符数", 256, 200000), "rpm_steps": text("10,30,60", "目标 RPM 档位"),
+                "rate_duration_seconds": number(30, "每档持续秒数", 10, 60), "rate_concurrency": number(10, "并发上限", 1, 100),
+                "rate_prompt_chars": number(1000, "速率测试输入字符数", 0, 200000), "rate_output_tokens": number(32, "速率测试输出上限", 1, 4096),
+                "max_tokens_field": text("max_completion_tokens", "输出字段", ["max_tokens", "max_completion_tokens"]),
+                "max_requests": number(150, "请求硬上限"), "timeout": TIMEOUT},
+        note="来自统一模型API测试/performance_metrics.py；没有 429 或 limit 响应头时只报告已验证下限，不推断限流边界。"),
+})
+
 # The common wrapper is the local acceptance profile; Python defaults fill its omitted flags.
 COMMON_SUITES = list(REGISTRY)[1:19]
 WRAPPER = SCRIPTS_ROOT / "run_model_all_tests.sh"
 LOCAL_PROFILE = {
+    "unified_api": dict(cases="chat,responses,instruction,self_correct,json_object,json_schema,function,parallel_tools,chat_sse,responses_sse,conversation,cache,context,concurrency", max_requests=40),
     "basic": dict(cases="basic,reasoning,stream,json_object,json_schema,tools,parallel_tools,partial,cache,conversation,context", rounds=5, max_requests=30, timeout=180),
     "api_features": dict(cases="responses,tools,vision_image,vision_video", image=IMAGE_FILE, video=VIDEO_FILE),
     "tool_loop": dict(timeout=180),
@@ -202,7 +220,7 @@ SOURCES = [
     ("独立验收", SCRIPTS_ROOT / "standalone-acceptance", "独立适配，保留原结论"),
     ("渠道诊断", SCRIPTS_ROOT / "az-channel-probe", "独立适配"),
     ("早期 K3 验收", SCRIPTS_ROOT / "model-test-scripts/k3-acceptance", "资料索引，未适配执行"),
-    ("统一 API 旧用例", SCRIPTS_ROOT / "测试模型/统一模型API测试", "资料索引，未适配执行"),
+    ("统一 API 与限流缓存", SCRIPTS_ROOT / "unified-api", "已适配两个入口，保留原用例和指标口径"),
     ("连续对话与恢复素材", SCRIPTS_ROOT / "测试模型/K3与GLM5.3-API测试素材", "原始 fixture 索引，按需选择素材"),
     ("GLM 专属", SCRIPTS_ROOT / "glm5.3", "资料索引，保留模型参数和历史证据"),
     ("Qwen 专属", SCRIPTS_ROOT / "qwen-3.8max", "资料索引，保留模型参数和历史证据"),
@@ -332,6 +350,25 @@ def make_plan(request, provider, model):
         for case, asset in (("vision_image", "image"), ("vision_video", "video")):
             if case in cases and not values[asset]:
                 raise ValueError(f"{case} 需要 {asset} 素材")
+    if sid in ("unified_api", "rate_cache_metrics"):
+        if not endpoint.startswith("https://") and urlsplit(endpoint).hostname not in ("localhost", "127.0.0.1", "::1"):
+            raise ValueError("统一 API 专项源脚本要求 HTTPS 渠道")
+        key = "cases" if sid == "unified_api" else "metrics"
+        selected = {v.strip() for v in values[key].split(",") if v.strip()}
+        allowed = {"chat", "responses", "instruction", "self_correct", "json_object", "json_schema", "function", "parallel_tools", "chat_sse", "responses_sse", "conversation", "cache", "context", "concurrency"} if sid == "unified_api" else {"ttft", "tpot", "tpm", "rpm", "cache"}
+        if not selected or selected - allowed:
+            raise ValueError("未知或空的专项用例 / 指标 IDs")
+        if sid == "rate_cache_metrics":
+            try:
+                steps = {int(v) for v in values["rpm_steps"].split(",")}
+                if not steps or min(steps) < 1 or max(steps) > 6000:
+                    raise ValueError()
+            except ValueError as exc:
+                raise ValueError("RPM 档位须为 1～6000 的逗号分隔整数") from exc
+            budget = (values["samples"] if selected & {"ttft", "tpot"} else 0) + (values["cache_rounds"] if "cache" in selected else 0)
+            budget += sum(math.ceil(v * values["rate_duration_seconds"] / 60) for v in steps) if selected & {"tpm", "rpm"} else 0
+            if budget > values["max_requests"]:
+                raise ValueError(f"计划 {budget} 次请求超过请求硬上限")
     plan["assets"] = [dict(parameter=k, path=str(Path(v).resolve()), sha256=digest(Path(v)))
                       for k, v in values.items() if k in ("image", "video") and v]
     config_path = _acceptance_config if sid == "acceptance" else SCRIPTS_ROOT / "az-channel-probe/config.local.json" if sid == "az_probe" else None
@@ -413,6 +450,12 @@ def script_command(plan, output):
     u = urlsplit(plan["endpoint"])
     path = u.path.removesuffix("/chat/completions")
     base = urlunsplit((u.scheme, u.netloc, path, "", ""))
+    if plan["suite_id"] in ("unified_api", "rate_cache_metrics"):
+        command = [sys.executable, "-u", plan["source"], "--config", str(output.parent / "source-config.json"), "--models", plan["model"]]
+        for key, value in plan["parameters"].items():
+            if key != "timeout" or plan["suite_id"] == "rate_cache_metrics":
+                command.extend(["--" + key.replace("_", "-"), str(value)])
+        return command + ["--execute", "--confirm-paid"]
     model_flag = "--models" if plan["suite_id"] == "az_probe" else "--model"
     command = [sys.executable, "-u", plan["source"], "--base-url", base,
                "--key-env", KEY_ENV, model_flag, plan["model"]]
