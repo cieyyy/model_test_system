@@ -91,16 +91,14 @@
     .field input, .field select, .field textarea { min-width: 120px; }
   }
 </style>
-<link rel="stylesheet" href="/static/workspace.css?v=20261016-nav">
-<link rel="stylesheet" href="/static/studio.css?v=20261016-nav">
+<link rel="stylesheet" href="/static/workspace.css?v=20261016-history2">
+<link rel="stylesheet" href="/static/studio.css?v=20261016-history2">
 </head>
 <body>
 <aside id="platformSidebar">
   <a class="workspace-brand" href="#dashboard" onclick="event.preventDefault();go('dashboard')"><span class="workspace-mark"><i data-lucide="aperture" aria-hidden="true"></i></span><span>模型测试<small>MODEL TESTING</small></span></a>
   <button id="workspaceNew" class="btn primary" onclick="workspaceNewTest()"><i data-lucide="plus" aria-hidden="true"></i>新建测试</button>
   <nav id="nav" aria-label="工作区导航"></nav>
-  <div class="workspace-history-heading">测试记录 <span id="workspaceHistoryCount">0</span></div>
-  <div id="workspaceHistory" aria-label="测试记录"></div>
   <div class="workspace-sidebar-footer"><i data-lucide="layers-2" aria-hidden="true"></i> 测试工作空间 <span>01</span></div>
 </aside>
 <div id="platformWorkspace">
@@ -116,10 +114,10 @@
 <div class="toast" id="toast"></div>
 
 <script src="/static/vendor/lucide.min.js"></script>
-<script src="/static/studio.js?v=20261016"></script>
-<script src="/static/suites.js"></script>
+<script src="/static/studio.js?v=20261016-history"></script>
+<script src="/static/suites.js?v=20261016-history"></script>
 <script src="/static/reports.js"></script>
-<script src="/static/workspace.js"></script>
+<script src="/static/workspace.js?v=20261016-history2"></script>
 <script>
 const API = "/api";
 let state = { tab: location.hash.slice(1) || "dashboard", providers: [], models: [], projects: [], stats: {}, legacyRoot: "" };
@@ -142,14 +140,15 @@ $("#mask").addEventListener("click", (e) => { if (e.target.id === "mask") closeM
 
 const TABS = [
   ["dashboard", "压测工作台"],
+  ["history", "测试记录"],
   ["overview", "总览"], ["providers", "中转站"], ["models", "模型"],
   ["projects", "测试项目"], ["exec", "执行测试"], ["suites", "测试套件"],
   ["reports", "压测报告"], ["matrix", "兼容性矩阵"], ["import", "导入旧资料"], ["settings", "设置"],
 ];
 
 function renderNav() {
-  const primary = ['dashboard', 'suites', 'reports'];
-  const icons={dashboard:'activity',overview:'layout-dashboard',providers:'network',models:'boxes',projects:'list-checks',exec:'terminal',suites:'flask-conical',reports:'chart-no-axes-combined',matrix:'grid-2x2',import:'folder-input',settings:'settings-2'};
+  const primary = ['dashboard', 'history', 'suites', 'reports'];
+  const icons={dashboard:'activity',history:'history',overview:'layout-dashboard',providers:'network',models:'boxes',projects:'list-checks',exec:'terminal',suites:'flask-conical',reports:'chart-no-axes-combined',matrix:'grid-2x2',import:'folder-input',settings:'settings-2'};
   const button = ([k, label]) => `<button class="${state.tab === k ? "active" : ""}" onclick="go('${k}')" ${state.tab===k?'aria-current="page"':''}><i data-lucide="${icons[k]}" aria-hidden="true"></i><span>${label}</span></button>`;
   $("#nav").innerHTML = TABS.filter(([k]) => primary.includes(k)).map(button).join('') +
     `<div class="workspace-nav-group" role="group" aria-label="管理"><div class="workspace-nav-heading">管理</div>${TABS.filter(([k]) => !primary.includes(k)).map(button).join('')}</div>`;
@@ -169,8 +168,7 @@ async function refreshData() {
 
 async function render() {
   await refreshData();
-  refreshWorkspaceHistory();
-  const R = { dashboard: renderDashboard, overview: renderOverview, providers: renderProviders, models: renderModels,
+  const R = { dashboard: renderDashboard, history: renderWorkspaceHistory, overview: renderOverview, providers: renderProviders, models: renderModels,
               projects: renderProjects, exec: renderExec, matrix: renderMatrix, import: renderImport, settings: renderSettings,
               suites: renderSuites, reports: renderSuiteReports };
   (R[state.tab] || renderDashboard)();

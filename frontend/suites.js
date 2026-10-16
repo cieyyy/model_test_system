@@ -201,7 +201,7 @@ async function suiteWatch(id,generation) {
     const live=j.runs.find(r=>r.status==='running')||[...j.runs].reverse().find(r=>!['queued'].includes(r.status));
     if(live?.suite_id==='benchmark') await workspaceBenchmark($('#suiteLive'),live.id);
     if(j.status==='running') suitePoll=setTimeout(()=>suiteWatch(id,generation),1000);
-    else { localStorage.removeItem('suiteJob'); refreshWorkspaceHistory(); }
+    else { localStorage.removeItem('suiteJob'); }
   } catch(e) { suiteError(e); }
 }
 async function suiteCancel(id) { try {await suitePost('/jobs/'+id+'/cancel');toast('已请求取消');} catch(e) {suiteError(e);} }

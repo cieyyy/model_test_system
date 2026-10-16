@@ -17,14 +17,14 @@ function studioToggleTheme() {
   studioRefreshTheme();
 }
 function studioHeading(view) {
-  const pages={dashboard:['01','PERFORMANCE','压测工作台'],suites:['02','TEST COLLECTION','测试套件'],reports:['03','REPORT LIBRARY','压测报告']};
+  const pages={dashboard:['01','PERFORMANCE','压测工作台'],history:['02','TEST HISTORY','测试记录'],suites:['03','TEST COLLECTION','测试套件'],reports:['04','REPORT LIBRARY','压测报告']};
   const [index,label,title]=pages[view];
   const date=new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
   return `<div class="studio-page-heading"><div><div class="studio-eyebrow"><span>${index}</span>${label}</div><h2>${title}<span class="studio-title-dot" aria-hidden="true">.</span></h2></div><div class="studio-date">${date}<span>MODEL TEST WORKSPACE</span></div></div>`;
 }
 const studioCommandIcons={
   '新建测试':'plus','一键测试全部项目':'list-checks','预览计划':'scan-line','执行计划':'play','运行本地模拟':'play',
-  '刷新报告':'refresh-cw','运行证据':'folder-open','取消测试':'square','保存新版本':'save','恢复保存版本':'rotate-ccw',
+  '刷新报告':'refresh-cw','刷新记录':'refresh-cw','查看结果':'arrow-up-right','运行证据':'folder-open','取消测试':'square','保存新版本':'save','恢复保存版本':'rotate-ccw',
   '新增行':'plus','收起':'chevron-up','恢复本机默认值':'rotate-ccw','HTML':'file-code-2','Excel / CSV':'sheet','JSON':'braces',
 };
 function studioDecorate() {

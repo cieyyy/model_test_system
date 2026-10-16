@@ -47,14 +47,6 @@ input[type=checkbox] { accent-color:var(--accent); }
 #nav button.active { color:var(--accent); background:var(--accent-bg); box-shadow:inset 2px 0 var(--accent); }
 #nav button:hover { background:var(--hover); color:var(--text); }
 #nav .workspace-nav-heading { padding:10px 12px; color:var(--text-3); }
-.workspace-history-heading { margin:23px 10px 11px; font-size:11px; }
-#workspaceHistoryCount { font-family:ui-monospace,monospace; color:var(--accent); }
-.workspace-history-item { border-radius:4px; padding:11px 10px; }
-.workspace-history-item:hover { background:var(--hover); }
-.workspace-history-item.active { background:var(--accent-bg); border-color:var(--accent-border); }
-.workspace-history-item strong { font-weight:500; }
-.workspace-history-item small { font-size:10px; }
-.workspace-demo { color:var(--accent); }
 .workspace-sidebar-footer { display:flex; gap:8px; align-items:center; border-color:var(--border); padding:18px 8px 0; }
 .workspace-sidebar-footer svg { width:13px; height:13px; }
 .workspace-sidebar-footer span { margin-left:auto; color:var(--accent); font-family:ui-monospace,monospace; }
@@ -131,13 +123,12 @@ summary { color:var(--text-2); cursor:pointer; font-size:12px; }
   .workspace-brand small { font-size:8px; margin-top:2px; }
   .workspace-mark { width:31px; height:31px; }
   #workspaceNew { width:auto; margin:0; min-height:35px; align-self:center; }
-  #nav { display:flex; padding:0; gap:4px; border:0; }
+  #nav { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); padding:0; gap:4px; border:0; }
+  #nav>.workspace-nav-group { grid-column:1/-1; }
   #nav>button,#nav .workspace-nav-group button { display:inline-flex; width:auto; min-height:36px; padding:8px; margin:0; font-size:12px; gap:6px; }
   #nav svg { width:15px; height:15px; }
   #nav .workspace-nav-heading { padding:8px; }
-  #workspaceHistory { max-height:57px; gap:7px; }
-  .workspace-history-item { padding:7px 8px; background:var(--surface); }
-  .workspace-history-heading,.workspace-sidebar-footer { display:none; }
+  .workspace-sidebar-footer { display:none; }
   #platformWorkspace>header { min-height:51px; padding:9px 16px; flex-wrap:nowrap; }
   .studio-breadcrumb { gap:6px; font-size:11px; }
   #platformWorkspace>header h1 { display:block; font-size:11px; }
