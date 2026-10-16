@@ -68,4 +68,6 @@ cd ../test-scripts/llm-benchmark
 
 浏览器集成验证：安装 Playwright 后，在仓库根目录运行 `node backend/tests/batch_reports_browser.cjs`，可用 TEST_PYTHON 指定 Python。该验证只调用本地模拟接口，不消耗模型额度。
 
+线上验证可设置 `PLATFORM_URL` 和 `LOGIN_FILE`（安装脚本生成的登录信息文本），运行 `node backend/tests/deployed_browser.cjs`。它检查 HTTPS、登录拦截、22 个入口、模拟压测、报告保存和桌面／手机曲线，会留下一份明确标记的模拟报告。
+
 GitHub 仓库只保存代码、模板及测试，不包含真实凭据、运行数据库、私人素材或历史结果。部署环境应始终保留整个 data 目录，丢失 secret.key 将无法解密已保存的 API Key。
