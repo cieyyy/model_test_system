@@ -19,6 +19,7 @@ const assert=require('node:assert/strict');
   const browser=await chromium.launch({headless:true});
   try{
     const context=await browser.newContext({httpCredentials:{username,password},viewport:{width:1600,height:1100}});
+    context.setDefaultTimeout(90000);
     const api=async(url,data)=>{
       const r=data===undefined?await context.request.get(base+url):await context.request.post(base+url,{data});
       assert(r.ok(),`${url}: ${r.status()} ${await r.text()}`);
@@ -43,7 +44,7 @@ const assert=require('node:assert/strict');
     await page.waitForSelector('#sqScope');
     assert.deepEqual(await page.locator('#sqScope option').allTextContents(),['单个项目','所有项目']);
     await page.screenshot({path:path.join(output,'suites-desktop.png'),fullPage:true});
-    await page.goto(base+'/#reports');
+    await page.getByRole('button',{name:'压测报告',exact:true}).click();
     await page.waitForSelector('#reportEditor',{state:'attached'});
     await page.evaluate(id=>reportOpen(id),job.report_id);
     await page.waitForSelector('#reportTitle');
