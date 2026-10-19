@@ -94,9 +94,13 @@ def source_snapshot(runs):
         if root and not root.is_relative_to(SUITE_RUNS.resolve()):
             raise ValueError("证据目录不在归档范围")
         manifest = root / "manifest.json" if root else None
+        source_files = [table["file"] for table in record.get("source_tables", [])]
+        if record.get("suite_id") == "benchmark" and record.get("report_dir"):
+            report_root = record["report_dir"].strip("/")
+            source_files.extend([f"{report_root}/report.html", f"{report_root}/report.json", f"{report_root}/requests.csv"])
         sources.append(dict(run_id=run.id, name=run.project_name, provider=run.provider_name, model=run.model_name,
                             status=run.status, demo=record.get("demo", False), suite_id=record.get("suite_id", ""),
-                            config=record.get("config", {}), files=[table["file"] for table in record.get("source_tables", [])],
+                            config=record.get("config", {}), files=source_files,
                             source_sha256=record.get("source_sha256", ""),
                             manifest_sha256=hashlib.sha256(manifest.read_bytes()).hexdigest() if manifest and manifest.is_file() else ""))
 

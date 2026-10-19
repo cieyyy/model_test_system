@@ -48,7 +48,7 @@ function reportRenderEditor() {
     <div class="report-downloads">${['html','csv','json'].map(k=>`<a class="btn small" data-report-export="${k}">${k==='csv'?'Excel / CSV':k.toUpperCase()}</a>`).join('')}<span class="suite-note">导出已保存版本</span></div>
     <div id="reportEditError" role="alert" class="suite-error"></div>
     <div class="report-layout"><div class="report-table-panel"><div class="suite-toolbar"><h3>结果与备注</h3><input id="reportSearch" type="search" placeholder="筛选项目或用例" aria-label="筛选报告结果" oninput="reportFilter=this.value;reportPage=0;reportRenderRows()"><button class="btn small" onclick="reportAddRow()">新增行</button></div><div id="reportRows"></div><div id="reportPagination" class="suite-toolbar"></div><p class="suite-note">人工编辑另存版本。原始断言与完整明细保存在运行证据中。</p></div>
-    <div class="report-preview-panel"><h3>实时预览</h3><iframe id="reportLivePreview" title="自定义报告实时预览" sandbox="allow-scripts"></iframe></div></div></div>`;
+    <div class="report-preview-panel"><h3>实时预览</h3><iframe id="reportLivePreview" title="自定义报告实时预览" sandbox="allow-scripts allow-popups allow-downloads"></iframe></div></div></div>`;
   $('#reportTemplate').value=d.template;
   for(const id of ['reportTitle','reportSubtitle','reportTemplate','reportAccent','reportSummary']) $('#'+id).addEventListener('input',reportCollect);
   for(const el of document.querySelectorAll('[data-section],[data-column]')) el.addEventListener('change',reportCollect);

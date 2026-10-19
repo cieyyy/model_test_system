@@ -154,11 +154,18 @@ def render(content, source):
         evidence = []
         for run in source["runs"]:
             files = " · ".join(
-                f'<a href="{escape(base)}/api/suites/runs/{run["run_id"]}/files/{quote(path, safe="/")}">{escape(path)}</a>'
+                f'<a href="{escape(base)}/api/suites/runs/{run["run_id"]}/files/{quote(path, safe="/")}" target="_blank" rel="noopener">{escape(path)}</a>'
                 for path in run.get("files", [])
             ) or "暂无文件清单"
+            preferred = next((path for path in run.get("files", []) if path.endswith("/report.html") or path == "report.html"), None)
+            preferred = preferred or (run.get("files") or [None])[0]
+            if preferred:
+                evidence_target = f'{escape(base)}/api/suites/runs/{run["run_id"]}/files/{quote(preferred, safe="/")}'
+                run_title = f'<a href="{evidence_target}" target="_blank" rel="noopener">#{run["run_id"]} {escape(run["name"])}</a>'
+            else:
+                run_title = f'<span>#{run["run_id"]} {escape(run["name"])}</span>'
             evidence.append(
-                f'<div class="evidence"><a href="{escape(base)}/#reports">#{run["run_id"]} {escape(run["name"])}</a>'
+                f'<div class="evidence">{run_title}'
                 f'<p>{escape(run["provider"])} · {escape(run["model"])}</p><p>{files}</p>'
                 f'<small>源脚本 SHA256：{escape(run["source_sha256"])}<br>证据清单 SHA256：{escape(run["manifest_sha256"])}</small></div>'
             )

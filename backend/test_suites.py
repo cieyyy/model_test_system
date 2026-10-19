@@ -534,6 +534,9 @@ class SuiteTests(unittest.TestCase):
         self.assertEqual(original["content"]["template"], "model_test")
         for marker in ("P99 TTFT", "P99 TPOT", "GEN. TOK/S", "SUCCESS RATE", "Detailed Results"):
             self.assertIn(marker, preview.text)
+        self.assertNotIn('href="/#reports"', preview.text)
+        self.assertIn("/api/suites/runs/", preview.text)
+        self.assertIn('target="_blank"', preview.text)
         self.assertNotIn('<script>alert("title")</script>', preview.text)
         self.assertIn('&lt;script&gt;', preview.text)
         self.assertIn('class="edited"', preview.text)

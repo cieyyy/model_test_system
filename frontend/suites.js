@@ -251,7 +251,7 @@ async function suiteShowReport(id) {
     if(r.suite_id==='benchmark') await workspaceBenchmark($('#suiteFullReport'),r.id,false);
     else if(!['running','queued'].includes(r.status)) {
       const report=await reportApi('',{run_ids:[r.id]});
-      $('#suiteFullReport').innerHTML=`<iframe class="suite-report" title="模型测试 HTML 报告" sandbox="allow-scripts" src="/api/suite-reports/${report.id}/view"></iframe>`;
+      $('#suiteFullReport').innerHTML=`<iframe class="suite-report" title="模型测试 HTML 报告" sandbox="allow-scripts allow-popups allow-downloads" src="/api/suite-reports/${report.id}/view"></iframe>`;
     } else $('#suiteFullReport').innerHTML='<p class="suite-note">测试执行中，结束后生成测试报告。</p>';
     $('#suiteReport').scrollIntoView({behavior:'smooth',block:'start'});
   } catch(e) {suiteError(e);}
