@@ -8,6 +8,18 @@ base=/opt/model-test
 repo=$base/repository
 git -C "$repo" fetch --prune origin
 revision=$(git -C "$repo" rev-parse --verify "${1:-origin/main}^{commit}")
+
+# The first installer copied this script to /usr/local/bin. Refresh that entrypoint
+# from the requested revision so future deployments can evolve the updater too.
+self_update=$(mktemp /tmp/model-test-update.XXXXXX)
+if git -C "$repo" show "$revision:deploy/update.sh" > "$self_update" 2>/dev/null; then
+    if ! cmp -s "$self_update" "$0"; then
+        install -m 755 "$self_update" /usr/local/bin/model-test-update
+        rm -f "$self_update"
+        exec /usr/local/bin/model-test-update "$@"
+    fi
+fi
+rm -f "$self_update"
 release=$base/releases/$revision
 previous=$(readlink -f "$base/current" || true)
 if [[ $previous == "$release" ]]; then
