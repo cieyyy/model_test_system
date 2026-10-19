@@ -38,7 +38,7 @@ function reportRenderEditor() {
   const d=reportDraft;
   $('#reportEditor').innerHTML=`<div class="suite-section"><div class="suite-toolbar"><h2>报告编辑</h2><span id="reportSaveState" class="suite-status"></span><button class="btn" onclick="reportDiscardDraft()">恢复保存版本</button><button class="btn primary" id="reportSave" onclick="reportSave()">保存新版本</button></div>
     <div class="suite-form">${suiteField('reportTitle','报告标题',d.title)}${suiteField('reportSubtitle','副标题',d.subtitle)}
-    <div class="field"><label for="reportTemplate">版式</label><select id="reportTemplate"><option value="standard">标准报告</option><option value="compact">紧凑报告</option><option value="acceptance">验收报告</option></select></div>
+    <div class="field"><label for="reportTemplate">版式</label><select id="reportTemplate"><option value="model_test">模型测试报告（参考本机 HTML）</option><option value="standard">标准报告</option><option value="compact">紧凑报告</option><option value="acceptance">验收报告</option></select></div>
     <div class="field"><label for="reportAccent">主题色</label><input type="color" id="reportAccent" value="${esc(d.accent)}"></div>
     <div class="field"><label for="reportVersions">历史版本</label><select id="reportVersions" onchange="reportOpen(${reportData.id},Number(this.value))">${reportData.versions.map(v=>`<option value="${v.version}" ${v.version===reportData.version?'selected':''}>v${v.version} · ${esc(v.editor)} · ${esc(v.change_summary)}</option>`).join('')}</select></div>
     ${suiteField('reportEditorName','编辑人','本机用户')}${suiteField('reportChange','修改说明','更新报告结论与展示')}

@@ -446,6 +446,9 @@ class SuiteTests(unittest.TestCase):
         content["rows"][0]["conclusion"] = '人工复核结论'
         preview = self.client.post(f"/api/suite-reports/{report_id}/preview", json=content)
         self.assertEqual(preview.status_code, 200, preview.text)
+        self.assertEqual(original["content"]["template"], "model_test")
+        for marker in ("P99 TTFT", "P99 TPOT", "GEN. TOK/S", "SUCCESS RATE", "Detailed Results"):
+            self.assertIn(marker, preview.text)
         self.assertNotIn('<script>alert("title")</script>', preview.text)
         self.assertIn('&lt;script&gt;', preview.text)
         self.assertIn('class="edited"', preview.text)

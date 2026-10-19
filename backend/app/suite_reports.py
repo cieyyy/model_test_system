@@ -43,7 +43,7 @@ class ReportContent(BaseModel):
     title: str = Field(default="模型测试报告", min_length=1, max_length=300)
     subtitle: str = Field(default="", max_length=1000)
     summary: str = Field(default="", max_length=20000)
-    template: Literal["standard", "compact", "acceptance"] = "standard"
+    template: Literal["model_test", "standard", "compact", "acceptance"] = "model_test"
     accent: str = Field(default="#087f63", pattern=r"^#[0-9a-fA-F]{6}$")
     sections: list[Literal["summary", "results", "curves", "evidence"]] = Field(default_factory=lambda: SECTIONS.copy(), max_length=4)
     columns: list[Literal["project", "case", "observed", "conclusion", "note"]] = Field(default_factory=lambda: list(COLUMNS), min_length=1, max_length=5)
@@ -168,6 +168,7 @@ def generate_report(run_ids=None, job_id=""):
             return existing.id
         source = source_snapshot(runs)
         content = ReportContent(title=f"{runs[0].model_name} 测试报告", subtitle=f"{runs[0].provider_name} · {runs[0].started_at:%Y-%m-%d %H:%M}",
+                                template="model_test",
                                 summary="测试执行结果与验收结论分开记录；请结合源脚本断言复核。", rows=source["rows"])
         report = SuiteReport(scope_key=scope, source_json=json.dumps(source, ensure_ascii=False, allow_nan=False))
         db.add(report)

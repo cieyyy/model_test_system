@@ -55,17 +55,34 @@ def observed(item):
 
 def overview(details):
     counts = Counter(d["outcome"] for d in details)
+    def values(key):
+        return sorted(n for d in details if (n := number(d.get(key))) is not None)
     def mean(key):
-        values = [n for d in details if (n := number(d.get(key))) is not None]
-        return round(statistics.mean(values), 2) if values else None
+        items = values(key)
+        return round(statistics.mean(items), 2) if items else None
+    def percentile(key, percentile):
+        items = values(key)
+        if not items:
+            return None
+        index = min(len(items) - 1, max(0, math.ceil(len(items) * percentile) - 1))
+        return round(items[index], 2)
     def total(key):
-        values = [n for d in details if (n := number(d.get(key))) is not None]
-        return sum(values) if values else None
+        items = values(key)
+        return sum(items) if items else None
     pairs = [(number(d.get("cached_tokens")), number(d.get("input_tokens"))) for d in details]
     pairs = [(cached, prompt) for cached, prompt in pairs if cached is not None and prompt is not None]
     denominator = sum(prompt for _, prompt in pairs)
+    speed_values = [
+        output / elapsed * 1000
+        for d in details
+        if (output := number(d.get("output_tokens"))) is not None
+        and (elapsed := number(d.get("elapsed_ms"))) not in (None, 0)
+    ]
     return dict(total=len(details), passed=counts["通过"], failed=counts["未通过"],
                 review=sum(counts[k] for k in ("人工复核", "待复核")), skipped=counts["跳过"],
                 data=counts["数据展示"], ttft_ms=mean("ttft_ms"), tpot_ms=mean("tpot_ms"),
+                p99_ttft_ms=percentile("ttft_ms", .99), p99_tpot_ms=percentile("tpot_ms", .99),
                 elapsed_ms=mean("elapsed_ms"), input_tokens=total("input_tokens"), output_tokens=total("output_tokens"),
+                gen_tok_s=round(statistics.mean(speed_values), 2) if speed_values else None,
+                success_rate=round(counts["通过"] / len(details) * 100, 2) if details else None,
                 cache_token_ratio=round(sum(cached for cached, _ in pairs) / denominator * 100, 2) if denominator else None)
