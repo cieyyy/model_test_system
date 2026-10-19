@@ -356,6 +356,7 @@ class SuiteTests(unittest.TestCase):
         self.assertEqual(table.json()["recognized"]["provider"], "relay-b")
         matrix = self.client.get("/api/matrix").json()
         self.assertTrue(any(row["provider_name"] == "relay-a" and row["model_name"] == "deepseek-v4.1" for row in matrix["rows"]))
+        self.assertFalse(any(row["provider_name"] == "本地模拟" for row in matrix["rows"]))
         preview = self.client.get(f"/api/assets/{imported['asset_id']}/preview")
         self.assertEqual(preview.status_code, 200)
         self.assertEqual(preview.json()["kind"], "html")

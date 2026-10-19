@@ -940,7 +940,8 @@ def _cell_status(runs: list[Run]) -> tuple[str, str]:
     actionable = [r for r in runs if r.status in {"passed", "failed"}]
     deferred = [r for r in runs if r not in actionable]
     if not actionable and deferred:
-        if all(r.error_class in _ERROR_CLASSES_INFRA for r in deferred if r.error_class):
+        infra_errors = [r.error_class for r in deferred if r.error_class]
+        if infra_errors and len(infra_errors) == len(deferred) and all(e in _ERROR_CLASSES_INFRA for e in infra_errors):
             return "unknown", "执行完成但只有鉴权/限流/服务端错误，无法判定兼容性"
         return "manual_review", "执行已完成，但没有可识别的业务断言"
     passed = sum(1 for r in actionable if r.passed)
@@ -960,7 +961,14 @@ def _cell_status(runs: list[Run]) -> tuple[str, str]:
 @router.get("/matrix")
 def matrix(db: Session = Depends(get_db)):
     """模型对比：行 = 模型×中转站，列 = 测试分类，格 = 结果结论 + 人工复核。"""
-    runs = db.scalars(select(Run).where(Run.status.in_(["passed", "failed", "completed", "error", "cancelled", "interrupted"]))).all()
+    runs = []
+    for run in db.scalars(select(Run).where(Run.status.in_(["passed", "failed", "completed", "error", "cancelled", "interrupted"]))).all():
+        try:
+            if json.loads(run.summary_json or "{}").get("demo"):
+                continue
+        except json.JSONDecodeError:
+            pass
+        runs.append(run)
     overrides: dict[tuple[int, str, str], MatrixReview] = {
         (o.provider_id, o.model_name, o.category): o for o in db.scalars(select(MatrixReview))
     }
