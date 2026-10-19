@@ -1,4 +1,5 @@
 let reportData=null, reportDraft=null, reportPage=0, reportFilter='', reportTimer=null, reportRevision=0, reportDirty=false;
+let reportRowsObserver=null;
 const reportColumns={project:'测试项目',case:'用例 / 指标',observed:'实测 / 原始判定',conclusion:'报告结论',note:'备注'};
 const reportSections={summary:'测试结论',results:'结果表格',curves:'指标曲线',evidence:'原始证据'};
 const reportApi=(path,body)=>api('/suite-reports'+path,body===undefined?{}:{method:'POST',body:JSON.stringify(body)});
@@ -76,10 +77,24 @@ function reportSaveState() {
   });
 }
 function reportRenderRows() {
+  reportRowsObserver?.disconnect();
   const entries=reportDraft.rows.map((r,i)=>({r,i})).filter(({r})=>(r.project+' '+r.case).toLowerCase().includes(reportFilter.toLowerCase()));
   const pages=Math.max(1,Math.ceil(entries.length/15));reportPage=Math.min(reportPage,pages-1);
-  $('#reportRows').innerHTML=`<div class="report-edit-table"><table><thead><tr><th>显示</th>${Object.values(reportColumns).map(v=>`<th>${v}</th>`).join('')}<th>操作</th></tr></thead><tbody>${entries.slice(reportPage*15,(reportPage+1)*15).map(({r,i})=>`<tr><td><input type="checkbox" aria-label="显示第 ${i+1} 行" ${r.visible?'checked':''} onchange="reportDraft.rows[${i}].visible=this.checked;reportChanged()"></td>${Object.entries(reportColumns).map(([k,label])=>`<td><textarea aria-label="第 ${i+1} 行${label}" rows="3" oninput="reportDraft.rows[${i}]['${k}']=this.value;reportChanged()">${esc(r[k])}</textarea></td>`).join('')}<td><button class="suite-config-icon" title="恢复原始行" aria-label="恢复第 ${i+1} 行" onclick="reportRestoreRow(${i})">↶</button><button class="suite-config-icon" title="上移" aria-label="上移第 ${i+1} 行" onclick="reportMoveRow(${i},-1)">↑</button><button class="suite-config-icon" title="下移" aria-label="下移第 ${i+1} 行" onclick="reportMoveRow(${i},1)">↓</button></td></tr>`).join('')}</tbody></table></div>`;
+  $('#reportRows').innerHTML=`<div class="report-edit-table"><table><thead><tr><th>显示</th>${Object.values(reportColumns).map(v=>`<th>${v}</th>`).join('')}<th>操作</th></tr></thead><tbody>${entries.slice(reportPage*15,(reportPage+1)*15).map(({r,i})=>`<tr><td><input type="checkbox" aria-label="显示第 ${i+1} 行" ${r.visible?'checked':''} onchange="reportDraft.rows[${i}].visible=this.checked;reportChanged()"></td>${Object.entries(reportColumns).map(([k,label])=>`<td><textarea aria-label="第 ${i+1} 行${label}" rows="1" oninput="reportFitCell(this);reportDraft.rows[${i}]['${k}']=this.value;reportChanged()">${esc(r[k])}</textarea></td>`).join('')}<td><div class="report-row-actions"><button class="suite-config-icon" title="恢复原始行" aria-label="恢复第 ${i+1} 行" onclick="reportRestoreRow(${i})">↶</button><button class="suite-config-icon" title="上移" aria-label="上移第 ${i+1} 行" ${i===0?'disabled':''} onclick="reportMoveRow(${i},-1)">↑</button><button class="suite-config-icon" title="下移" aria-label="下移第 ${i+1} 行" ${i===reportDraft.rows.length-1?'disabled':''} onclick="reportMoveRow(${i},1)">↓</button></div></td></tr>`).join('')}</tbody></table></div>`;
   $('#reportPagination').innerHTML=`<span class="suite-status">${entries.length} 行 · ${reportPage+1} / ${pages} 页</span><div><button class="btn small" ${reportPage?'':'disabled'} onclick="reportPage--;reportRenderRows()">上一页</button> <button class="btn small" ${reportPage<pages-1?'':'disabled'} onclick="reportPage++;reportRenderRows()">下一页</button></div>`;
+  const table=$('#reportRows table');
+  const fitCells=()=>table.querySelectorAll('textarea').forEach(reportFitCell);
+  fitCells();
+  let width=table.getBoundingClientRect().width;
+  reportRowsObserver=new ResizeObserver(()=>{
+    const nextWidth=table.getBoundingClientRect().width;
+    if(nextWidth!==width){width=nextWidth;fitCells();}
+  });
+  reportRowsObserver.observe(table);
+}
+function reportFitCell(input) {
+  input.style.height='auto';
+  input.style.height=input.scrollHeight+'px';
 }
 function reportRestoreRow(i) {
   const original=reportData.source.rows.find(r=>r.id===reportDraft.rows[i].id);

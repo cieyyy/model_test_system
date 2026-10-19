@@ -75,7 +75,7 @@ main>h2:first-child { font-size:25px; padding:7px 0 24px; margin-bottom:22px; bo
 .suite-toolbar { margin:18px 0; gap:12px; }
 .suite-form { gap:18px 22px; margin:22px 0; }
 .field label { color:var(--text-2); font-size:12px; margin-bottom:3px; }
-.field input,.field select,.field textarea,#reportSearch,.report-edit-table textarea { background:var(--input); color:var(--text); border:1px solid var(--border-strong); border-radius:5px; padding:10px 11px; min-height:39px; }
+.field input,.field select,.field textarea,#reportSearch { background:var(--input); color:var(--text); border:1px solid var(--border-strong); border-radius:5px; padding:10px 11px; min-height:39px; }
 .field input:disabled,.field select:disabled { opacity:.4; }
 .field input[type=color] { padding:6px; }
 .checkline { font-size:12px; color:var(--text-2); padding:12px 0; }
@@ -108,7 +108,6 @@ tbody tr:hover { background:var(--surface); }
 .toast { background:var(--text); color:var(--bg); border:1px solid var(--border-strong); }
 .report-layout { gap:26px; }
 .report-layout h3 { color:var(--text-2); font-weight:500; }
-.report-edit-table textarea { font:12px/1.6 -apple-system,"PingFang SC",sans-serif; }
 #reportLivePreview { border-color:var(--border-strong); }
 .report-options strong { color:var(--text-2); font-weight:500; }
 .report-downloads { padding-bottom:15px; border-bottom:1px solid var(--border); }
