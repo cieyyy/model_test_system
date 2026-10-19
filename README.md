@@ -27,7 +27,7 @@ Ubuntu 24.04，使用 systemd + Nginx。平台以专用普通用户运行，后�
 - `/var/lib/model-test/acceptance-fixtures`：独立验收材料，每版软链接复用。
 - `/etc/model-test/platform.env`：环境变量，见 deploy/platform.env.example。
 - `/etc/model-test/htpasswd`：登录密码哈希；使用 `htpasswd /etc/model-test/htpasswd admin` 修改。
-- `/var/backups/model-test`：更新前的完整数据备份，包含 secret.key，权限仅 root 可读。
+- `/var/backups/model-test`：更新前的数据快照，包含 secret.key，权限仅 root 可读；不可变测试证据和导入对象使用硬链接快照节省磁盘，保留最近 5 份。
 
 初次部署（适用于未配置其他站点的 Ubuntu 服务器，80/443 端口需开放）：
 
@@ -48,7 +48,7 @@ model-test-update
 
 脚本拉取 main、安装锁定依赖、运行离线测试，再进入维护状态。有任务执行时拒绝更新；无任务时停止服务，备份数据库、密钥和证据，切换版本并健康检查。失败自动恢复前一版代码和数据。更新脚本自身通过重新安装 `deploy/update.sh` 到 `/usr/local/bin/model-test-update` 升级；systemd/Nginx 配置变更需管理员单独应用。
 
-回到指定已知提交：`model-test-update <commit>`。这是代码切换，会保留当前数据库；跨不兼容结构版本需停止服务并从对应备份恢复整个 data 目录，再启动。备份包含敏感密钥，应保存到受控位置，定期清理旧备份和无用 releases。
+回到指定已知提交：`model-test-update <commit>`。这是代码切换，会保留当前数据库；跨不兼容结构版本需停止服务并从对应备份恢复整个 data 目录，再启动。备份包含敏感密钥，更新脚本会保留最近 5 份数据快照和当前/前一版本及少量旧 release。
 
 ```bash
 systemctl status model-test

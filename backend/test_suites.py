@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import tempfile
 import threading
@@ -328,6 +329,89 @@ class SuiteTests(unittest.TestCase):
             self.assertEqual(detail["status"], "imported")
             escaped = self.client.get(f"/api/suites/runs/{first['run_id']}/files/%2e%2e/%2e%2e/app.db")
             self.assertNotEqual(escaped.status_code, 200)
+
+    def test_upload_html_and_table_are_deduplicated_and_enter_model_comparison(self):
+        html = b"""<!doctype html><table><tr><th>case</th><th>result</th><th>http_status</th></tr>
+        <tr><td>basic</td><td>pass</td><td>200</td></tr>
+        <tr><td>tools</td><td>fail</td><td>200</td></tr></table>"""
+        first = self.client.post(
+            "/api/import/upload?filename=deepseek-v4.1-report.html&provider=relay-a&model=deepseek-v4.1&category=stream",
+            content=html,
+        )
+        self.assertEqual(first.status_code, 200, first.text)
+        imported = first.json()
+        self.assertTrue(imported["imported"])
+        self.assertEqual(imported["recognized"]["rows"], 2)
+        duplicate = self.client.post(
+            "/api/import/upload?filename=deepseek-v4.1-report.html&provider=relay-a&model=deepseek-v4.1&category=stream",
+            content=html,
+        )
+        self.assertEqual(duplicate.status_code, 200, duplicate.text)
+        self.assertTrue(duplicate.json()["duplicate"])
+        table = self.client.post(
+            "/api/import/upload?filename=deepseek-v4.1.csv&provider=relay-b&model=deepseek-v4.1&category=stream",
+            content=b"case,result,http_status\nbasic,pass,200\n",
+        )
+        self.assertEqual(table.status_code, 200, table.text)
+        self.assertEqual(table.json()["recognized"]["provider"], "relay-b")
+        matrix = self.client.get("/api/matrix").json()
+        self.assertTrue(any(row["provider_name"] == "relay-a" and row["model_name"] == "deepseek-v4.1" for row in matrix["rows"]))
+        preview = self.client.get(f"/api/assets/{imported['asset_id']}/preview")
+        self.assertEqual(preview.status_code, 200)
+        self.assertEqual(preview.json()["kind"], "html")
+
+    def test_import_preserves_partial_review_and_multirelay_groups(self):
+        html = """<!doctype html><table><tr><th>指标</th><th>数值</th></tr><tr><td>平均延迟</td><td>12</td></tr></table>
+        <table><tr><th>测试项目</th><th>原始判定</th><th>HTTP</th></tr>
+        <tr><td>基础调用</td><td>通过</td><td>200</td></tr>
+        <tr><td>工具调用</td><td>部分通过</td><td>200</td></tr>
+        <tr><td>长上下文</td><td>待复核</td><td>504</td></tr></table>""".encode()
+        response = self.client.post(
+            "/api/import/upload?filename=deepseek-v4.1-full.html&provider=relay-c&model=deepseek-v4.1&category=统一测试",
+            content=html,
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        group = response.json()["recognized"]["groups"][0]
+        self.assertEqual((group["passed"], group["partial"], group["manual_review"]), (1, 1, 1))
+        matrix = self.client.get("/api/matrix").json()
+        row = next(r for r in matrix["rows"] if r["provider_name"] == "relay-c" and r["model_name"] == "deepseek-v4.1")
+        self.assertEqual(row["cells"]["统一测试"]["effective_status"], "partial")
+        detail = self.client.get("/api/matrix/detail", params={"provider_id": row["provider_id"], "model_name": row["model_name"], "category": "统一测试"}).json()
+        evidence = self.client.get(f"/api/runs/{detail['runs'][0]['id']}").json()["evidence"]["source_rows"]
+        self.assertEqual(evidence["records"], 3)
+        self.assertEqual(evidence["source_rows"], [2, 3, 4])
+
+    def test_http_success_without_assertion_is_review_and_xlsx_zero_is_kept(self):
+        response = self.client.post(
+            "/api/import/upload?filename=review.csv&provider=relay-review&model=deepseek-v4.1&category=raw",
+            content=b"case,http_status\nonly-http,200\n",
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        group = response.json()["recognized"]["groups"][0]
+        self.assertEqual(group["manual_review"], 1)
+        workbook_path = Path(TEMP.name) / "zero.xlsx"
+        from openpyxl import Workbook
+        workbook = Workbook()
+        workbook.active.append(["case", "result", "latency_ms"])
+        workbook.active.append(["zero", "pass", 0])
+        workbook.save(workbook_path)
+        xlsx = self.client.post(
+            "/api/import/upload?filename=zero.xlsx&provider=relay-xlsx&model=deepseek-v4.1&category=raw",
+            content=workbook_path.read_bytes(),
+        )
+        self.assertEqual(xlsx.status_code, 200, xlsx.text)
+        self.assertEqual(xlsx.json()["recognized"]["groups"][0]["passed"], 1)
+        self.assertEqual(xlsx.json()["recognized"]["groups"][0]["rows"], 1)
+
+    def test_import_groups_rows_by_provider_and_model_without_duplication(self):
+        csv_data = b"provider,model,case,result\nrelay-one,deepseek-v4.1,a,pass\nrelay-two,deepseek-v4.1,a,pass\n"
+        response = self.client.post("/api/import/upload?filename=multi.csv&category=stream", content=csv_data)
+        self.assertEqual(response.status_code, 200, response.text)
+        groups = response.json()["recognized"]["groups"]
+        self.assertEqual({(g["provider"], g["model"]) for g in groups}, {("relay-one", "deepseek-v4.1"), ("relay-two", "deepseek-v4.1")})
+        digest = hashlib.sha256(csv_data).hexdigest()
+        objects = list((Path(TEMP.name) / "import_objects").rglob(f"{digest}.*"))
+        self.assertEqual(len(objects), 1)
 
     def test_restart_recovery_does_not_touch_old_runs(self):
         with SessionLocal() as db:

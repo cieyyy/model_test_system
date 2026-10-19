@@ -2,16 +2,19 @@
 from __future__ import annotations
 
 import datetime as dt
+import json
 import os
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from . import security
 from .db import (
     Credential,
+    DATA_DIR,
     ImportedAsset,
     MatrixReview,
     ModelEntity,
@@ -104,6 +107,8 @@ def _guess_model_names(name: str) -> list[str]:
     if "deepseek" in n:
         out.append("deepseek-v4.1")
     return out
+
+
 
 
 # ---------- 健康与统计 ----------
@@ -445,7 +450,8 @@ def delete_project(project_id: int, db: Session = Depends(get_db)):
 def project_assets(project_id: int, db: Session = Depends(get_db)):
     p = _get_or_404(db, TestProject, project_id, "测试项目")
     return [
-        {"id": a.id, "rel_path": a.rel_path, "file_kind": a.file_kind, "size_bytes": a.size_bytes}
+        {"id": a.id, "rel_path": a.rel_path, "file_kind": a.file_kind, "size_bytes": a.size_bytes,
+         "sha256": a.sha256, "storage_path": a.storage_path}
         for a in p.assets
     ]
 
@@ -457,6 +463,14 @@ _PREVIEW_LIMIT = 200 * 1024  # 文本预览最多 200KB
 
 
 def _asset_abs_path(asset: ImportedAsset) -> Path:
+    if asset.storage_path:
+        root = DATA_DIR.resolve()
+        p = (root / asset.storage_path).resolve()
+        if p != root and root not in p.parents:
+            raise HTTPException(400, "资产路径越界，已拒绝")
+        if not p.is_file():
+            raise HTTPException(404, "服务器归档文件不存在")
+        return p
     root = Path(os.environ.get("MT_LEGACY_ROOT", DEFAULT_LEGACY_ROOT)).resolve()
     p = (root / asset.rel_path).resolve()
     if root not in p.parents and p != root:
@@ -486,12 +500,15 @@ def _preview_payload(p: Path) -> dict:
         mime = "image/svg+xml" if ext == "svg" else f"image/{'jpeg' if ext == 'jpg' else ext}"
         return {"kind": "image", "name": p.name, "ext": ext,
                 "data": f"data:{mime};base64,{base64.b64encode(data).decode()}"}
-    raw = p.read_bytes()
-    if b"\x00" in raw[:4096]:  # 二进制
-        return {"kind": "binary", "name": p.name, "size": len(raw)}
+    size = p.stat().st_size
+    with p.open("rb") as handle:
+        probe = handle.read(4096)
+        if b"\x00" in probe:  # 二进制
+            return {"kind": "binary", "name": p.name, "size": size}
+        raw = probe + handle.read(_PREVIEW_LIMIT + 1 - len(probe))
     text = raw.decode("utf-8", errors="replace")
-    return {"kind": "text", "name": p.name, "ext": ext, "size": len(raw),
-            "truncated": len(text) > _PREVIEW_LIMIT, "content": text[:_PREVIEW_LIMIT]}
+    return {"kind": "html" if ext in ("html", "htm") else "text", "name": p.name, "ext": ext, "size": size,
+            "truncated": size > _PREVIEW_LIMIT, "content": text[:_PREVIEW_LIMIT]}
 
 
 def _open_with_default(p: Path) -> None:
@@ -516,6 +533,15 @@ def asset_preview(asset_id: int, db: Session = Depends(get_db)):
     return _preview_payload(_asset_abs_path(a))
 
 
+@router.get("/assets/{asset_id}/download")
+def asset_download(asset_id: int, db: Session = Depends(get_db)):
+    """浏览器下载服务器归档原文件；不会在服务器本机调用默认应用。"""
+    a = db.get(ImportedAsset, asset_id)
+    if not a:
+        raise HTTPException(404, "资产不存在")
+    return FileResponse(_asset_abs_path(a), filename=a.rel_path or f"asset-{a.id}")
+
+
 @router.post("/assets/{asset_id}/open")
 def asset_open(asset_id: int, db: Session = Depends(get_db)):
     """用系统默认软件打开文件（macOS open / Windows os.startfile / Linux xdg-open）。"""
@@ -538,6 +564,12 @@ def file_open(path: str, root: str = ""):
     p = _resolve_under_root(path, root)
     _open_with_default(p)
     return {"ok": True, "path": str(p), "opened_with": "系统默认应用"}
+
+
+@router.get("/files/download")
+def file_download(path: str, root: str = ""):
+    p = _resolve_under_root(path, root)
+    return FileResponse(p, filename=p.name)
 
 
 @router.post("/import/item-files")
@@ -569,6 +601,8 @@ def import_item_files(req: ItemFilesRequest):
             for f in files[:2000]
         ],
     }
+
+
 
 
 # ---------- 旧资料导入（只读扫描，不移动不复制） ----------
@@ -853,13 +887,17 @@ def run_detail(run_id: int):
                             evidence[name] = f.read_text(encoding="utf-8").splitlines()[:20]
                         else:
                             evidence[name] = f.read_text(encoding="utf-8")
+                if json.loads(r.summary_json or "{}").get("imported"):
+                    records = d / "records.json"
+                    if records.is_file() and records.stat().st_size <= 2 * 1024 * 1024:
+                        evidence["source_rows"] = json.loads(records.read_text(encoding="utf-8"))
         out["evidence"] = evidence
         return out
     finally:
         db.close()
 
 
-# ---------- 兼容性矩阵（阶段 4） ----------
+# ---------- 模型对比（保留 /matrix API 兼容旧客户端） ----------
 
 STANDARD_CATEGORIES = ["chat", "stream", "json", "tools"]
 REVIEW_STATUSES = {"compatible", "partial", "unsupported", "unknown", "manual_review"}
@@ -876,8 +914,38 @@ def _run_category(r: Run) -> str:
 
 def _cell_status(runs: list[Run]) -> tuple[str, str]:
     """从同 (中转站, 模型, 分类) 的一组运行记录推断兼容性结论，返回 (状态, 依据)。"""
-    passed = sum(1 for r in runs if r.passed)
-    failed = len(runs) - passed
+    imported = []
+    for r in runs:
+        try:
+            metadata = json.loads(r.summary_json or "{}")
+            summary = metadata.get("summary", {})
+        except json.JSONDecodeError:
+            metadata = {}
+            summary = {}
+        if metadata.get("imported") and summary:
+            imported.append(summary)
+    if imported:
+        passed = sum(int(s.get("passed", 0)) for s in imported)
+        failed = sum(int(s.get("failed", 0)) for s in imported)
+        partial = sum(int(s.get("partial", 0)) for s in imported)
+        review = sum(int(s.get("manual_review", 0)) for s in imported)
+        total = passed + failed + partial + review
+        if total and passed == total:
+            return "compatible", f"{passed} 条源断言全部通过"
+        if review == total:
+            return "manual_review", f"{total} 条源断言待复核"
+        if failed == total:
+            return "unsupported", f"{failed} 条源断言全部失败"
+        return "partial", f"通过 {passed} / 失败 {failed} / 部分 {partial} / 待复核 {review}"
+    actionable = [r for r in runs if r.status in {"passed", "failed"}]
+    deferred = [r for r in runs if r not in actionable]
+    if not actionable and deferred:
+        if all(r.error_class in _ERROR_CLASSES_INFRA for r in deferred if r.error_class):
+            return "unknown", "执行完成但只有鉴权/限流/服务端错误，无法判定兼容性"
+        return "manual_review", "执行已完成，但没有可识别的业务断言"
+    passed = sum(1 for r in actionable if r.passed)
+    failed = len(actionable) - passed
+    failed += len(deferred)
     if failed == 0:
         return "compatible", f"{passed} 次执行全部通过"
     if passed == 0:
@@ -891,8 +959,8 @@ def _cell_status(runs: list[Run]) -> tuple[str, str]:
 
 @router.get("/matrix")
 def matrix(db: Session = Depends(get_db)):
-    """兼容性矩阵：行 = 模型×中转站，列 = 测试分类，格 = 兼容性结论 + 人工复核。"""
-    runs = db.scalars(select(Run).where(Run.status.in_(["passed", "failed"]))).all()
+    """模型对比：行 = 模型×中转站，列 = 测试分类，格 = 结果结论 + 人工复核。"""
+    runs = db.scalars(select(Run).where(Run.status.in_(["passed", "failed", "completed", "error", "cancelled", "interrupted"]))).all()
     overrides: dict[tuple[int, str, str], MatrixReview] = {
         (o.provider_id, o.model_name, o.category): o for o in db.scalars(select(MatrixReview))
     }

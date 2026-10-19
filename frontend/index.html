@@ -64,8 +64,15 @@
   .empty { text-align: center; color: var(--text-3); padding: 30px 0; }
   .modal-mask { position: fixed; inset: 0; background: rgba(40,40,38,.4); display: none; align-items: center; justify-content: center; z-index: 50; }
   .modal-mask.show { display: flex; }
-  .modal { background: var(--surface); border-radius: 12px; padding: 22px 24px; width: min(560px, 92vw); max-height: 82vh; overflow: auto; }
-  .modal h3 { font-size: 15px; margin-bottom: 12px; }
+  .modal { background: var(--surface); border-radius: 12px; padding: 22px 24px; width: min(760px, 92vw); height: min(680px, 82vh); min-width: 320px; min-height: 180px; max-width: calc(100vw - 24px); max-height: calc(100vh - 24px); resize: both; overflow: auto; }
+  .modal.preview-modal { width: min(1200px, 94vw); height: min(820px, 92vh); display: flex; flex-direction: column; overflow: hidden; }
+  .modal.preview-modal.is-max { width: calc(100vw - 24px); height: calc(100vh - 24px); }
+  .preview-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 12px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); }
+  .preview-toolbar label { font-size: 12px; color: var(--text-2); } .preview-toolbar input[type=range] { width: 150px; accent-color: var(--accent); }
+  .preview-toolbar output { min-width: 42px; font: 12px/1.4 "SF Mono",Menlo,monospace; color: var(--accent); }
+  .preview-content { flex: 1; min-height: 0; overflow: auto; } .preview-content iframe { display: block; width: 100%; height: 100%; min-height: 420px; border: 1px solid var(--border); background: #fff; }
+  .preview-text { flex: 1; min-height: 0; max-height: none !important; }
+  .modal h3 { font-size: 15px; margin-bottom: 12px; } .preview-modal h3 { flex: none; }
   .modal .foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
   .keybox { font-family: "SF Mono", Menlo, monospace; background: #f1efe8; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; word-break: break-all; font-size: 13px; margin: 10px 0; }
   .toast { position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%); background: #2c2c2a; color: #fff; padding: 9px 18px; border-radius: 8px; font-size: 13px; opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 99; }
@@ -134,7 +141,7 @@ async function api(path, opts = {}) {
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.statusText); }
   return res.json();
 }
-function openModal(html) { $("#modalBox").innerHTML = html; $("#mask").classList.add("show"); }
+function openModal(html) { const box = $("#modalBox"); box.classList.remove("preview-modal", "is-max"); box.innerHTML = html; $("#mask").classList.add("show"); }
 function closeModal() { $("#mask").classList.remove("show"); }
 $("#mask").addEventListener("click", (e) => { if (e.target.id === "mask") closeModal(); });
 
@@ -143,7 +150,7 @@ const TABS = [
   ["history", "测试记录"],
   ["overview", "总览"], ["providers", "中转站"], ["models", "模型"],
   ["projects", "测试项目"], ["exec", "执行测试"], ["suites", "新建测试"],
-  ["reports", "测试报告"], ["matrix", "兼容性矩阵"], ["import", "导入旧资料"], ["settings", "设置"],
+  ["reports", "测试报告"], ["matrix", "模型对比"], ["import", "导入测试记录"], ["settings", "设置"],
 ];
 
 function renderNav() {
@@ -551,12 +558,12 @@ window.viewAssets = viewAssets;
 async function previewAsset(aid) {
   let d;
   try { d = await api(`/assets/${aid}/preview`); } catch (err) { toast(err.message); return; }
+  d.download_url = `${API}/assets/${aid}/download`;
   showPreviewModal(d);
 }
 window.previewAsset = previewAsset;
 async function openAsset(aid) {
-  try { const r = await api(`/assets/${aid}/open`, { method: "POST" }); toast("已用系统默认软件打开"); }
-  catch (err) { toast(err.message); }
+  window.open(`${API}/assets/${aid}/download`, "_blank", "noopener");
 }
 window.openAsset = openAsset;
 
@@ -583,7 +590,7 @@ async function renderExec() {
       <td>${esc(r.project_name)}</td>
       <td>${esc(r.model_name)}</td>
       <td>${r.http_status || "—"}</td>
-      <td class="${r.status === "passed" ? "pass" : "fail"}">${r.status === "passed" ? "通过" : r.status === "failed" ? "失败" : r.status}</td>
+      <td class="${r.status === "passed" ? "pass" : r.status === "failed" ? "fail" : ""}">${r.status === "passed" ? "通过" : r.status === "failed" ? "失败" : r.status === "completed" ? "已导入" : r.status}</td>
       <td>${esc(r.verdict).slice(0, 40)}</td>
       <td>${r.duration_ms}ms${r.ttft_ms ? ` / ${r.ttft_ms}ms` : ""}</td>
       <td><button class="btn small" onclick="viewRun(${r.id})">证据</button></td>
@@ -798,10 +805,11 @@ async function viewRun(id) {
     const tabs = files.length
       ? `<div class="ev-tabs" id="ev-tabs">${files.map((f, i) => `<button class="${i === 0 ? "on" : ""}" onclick="evTab('${f}')">${f}</button>`).join("")}</div><div class="mono" id="ev-body"></div>`
       : '<div class="hint">证据目录为空（可能是执行前被取消）</div>';
+    const original = r.summary?.asset_id ? `<a class="btn small" href="${API}/assets/${encodeURIComponent(r.summary.asset_id)}/download" target="_blank" rel="noopener">原始文件</a>` : "";
     openModal(`<h3>运行 #${r.id} 证据 <span class="tag">${esc(r.project_name)}</span> <span class="tag ${r.status === "passed" ? "" : "off"}">${r.status}</span></h3>
       <div class="hint">${esc(r.verdict)} · 耗时 ${r.duration_ms}ms${r.ttft_ms ? ` · 首Token ${r.ttft_ms}ms` : ""} · 证据目录 <span class="code">${esc(r.evidence_dir)}</span></div>
       ${tabs}
-      <div class="foot"><button class="btn" onclick="closeModal()">关闭</button></div>`);
+      <div class="foot">${original}<button class="btn" onclick="closeModal()">关闭</button></div>`);
     window._ev = r.evidence;
     if (files.length) evTab(files[0]);
   } catch (err) { toast(err.message); }
@@ -818,7 +826,7 @@ function evTab(name) {
 window.evTab = evTab;
 
 
-/* ---------------- 兼容性矩阵（阶段 4） ---------------- */
+/* ---------------- 模型对比 ---------------- */
 const MX_CAT_CN = { chat: "对话", stream: "流式", json: "JSON", tools: "工具" };
 const MX_ST_CN = { compatible: "兼容", partial: "部分", unsupported: "不支持", unknown: "未知", untested: "未测试", manual_review: "待复核" };
 const MX_ST_CLS = { compatible: "ok", partial: "warn", unsupported: "off", unknown: "gray", untested: "gray", manual_review: "" };
@@ -848,7 +856,7 @@ async function renderMatrix() {
       }).join("")}
     </tr>`).join("");
   $("#main").innerHTML = `
-    <h2>兼容性矩阵</h2>
+    <h2>模型对比</h2>
     <div class="hint">同一模型的多行相邻排列，即<b>跨中转站对比</b>——同一模型在不同中转站的能力差异一目了然。结论由运行记录自动聚合：兼容 = 全部通过；部分 = 有通过有失败；不支持 = 全部假成功（HTTP 200 但功能未生效）；未知 = 失败但属鉴权/限流/服务端错误。<b>✎</b> 表示已有人工复核。点击色块查看明细、复核与备注。</div>
     <div class="grid">${stats}</div>
     ${m.rows.length ? `<table><tr><th>模型</th><th>中转站</th>${head}</tr>${rows}</table>` : '<div class="card empty">还没有可展示的数据——先到「执行测试」跑一轮，或在「中转站」「模型」完成登记</div>'}
@@ -869,7 +877,7 @@ async function cellDetail(i, j) {
       <td class="code">${esc(r.started_at)}</td>
       <td>${esc(r.project_name)}</td>
       <td>${r.http_status || "—"}</td>
-      <td class="${r.status === "passed" ? "pass" : "fail"}">${r.status === "passed" ? "通过" : "失败"}</td>
+      <td class="${r.status === "passed" ? "pass" : r.status === "failed" ? "fail" : ""}">${r.status === "passed" ? "通过" : r.status === "failed" ? "失败" : "导入记录"}</td>
       <td>${esc(r.verdict).slice(0, 50)}</td>
       <td>${r.duration_ms}ms${r.ttft_ms ? ` / ${r.ttft_ms}ms` : ""}</td>
       <td><button class="btn small" onclick="viewRun(${r.id})">证据</button></td>
@@ -913,9 +921,40 @@ window.mxReview = mxReview;
 
 
 /* ---------------- 导入 ---------------- */
+async function uploadTestRecord(e) {
+  e.preventDefault();
+  const file = $("#recordFile").files[0];
+  if (!file) { toast("请选择 HTML 或表格文件"); return false; }
+  const params = new URLSearchParams({
+    filename: file.name,
+    provider: $("#recordProvider").value.trim(),
+    model: $("#recordModel").value.trim(),
+    category: $("#recordCategory").value.trim(),
+  });
+  try {
+    const response = await fetch(`${API}/import/upload?${params}`, {
+      method: "POST",
+      headers: { "Content-Type": file.type || "application/octet-stream" },
+      body: file,
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.detail || response.statusText);
+    const r = data.recognized;
+    toast(data.duplicate ? "相同文件和对比条件已存在，未重复存储" : `已归档并识别 ${r.rows} 行，正在打开模型对比`);
+    state.tab = "matrix"; history.replaceState(null, "", "#matrix"); renderNav(); await render();
+  } catch (err) { toast(err.message); }
+  return false;
+}
+window.uploadTestRecord = uploadTestRecord;
 async function renderImport() {
-  const scan = await api("/import/scan", { method: "POST", body: JSON.stringify({}) });
-  state.legacyRoot = scan.root;
+  let scan = { root: state.legacyRoot || "", items: [] };
+  try {
+    scan = await api("/import/scan", { method: "POST", body: JSON.stringify({ root: state.legacyRoot || "" }) });
+    state.legacyRoot = scan.root;
+  } catch (err) {
+    // Uploading server-side records remains available even when the old local source directory is absent.
+    toast("旧资料目录暂不可扫描，但仍可直接上传测试记录");
+  }
   const rows = scan.items.map((it, i) => `
     <tr>
       <td><div class="checkline"><input type="checkbox" class="imp-check" value="${esc(it.name)}" ${it.imported ? "disabled" : ""}>
@@ -928,8 +967,18 @@ async function renderImport() {
     </tr>`).join("");
   window._scanItems = scan.items;
   $("#main").innerHTML = `
-    <h2>导入旧资料</h2>
-    <div class="hint">扫描旧测试目录（<span class="code">${esc(scan.root)}</span>）并登记为测试项目。只记录文件路径，<b>不移动、不复制、不修改</b>任何原文件。</div>
+    <h2>导入测试记录</h2>
+    <div class="card">
+      <form class="row" onsubmit="return uploadTestRecord(event)">
+        <div class="field"><label>测试记录文件 *</label><input id="recordFile" type="file" accept=".html,.htm,.csv,.tsv,.xlsx,.json" required></div>
+        <div class="field"><label>中转站（可选）</label><input id="recordProvider" placeholder="如 666api"></div>
+        <div class="field"><label>模型（可选）</label><input id="recordModel" placeholder="如 deepseek-v4.1"></div>
+        <div class="field"><label>测试分类（可选）</label><input id="recordCategory" placeholder="如 stream / tools"></div>
+        <button class="btn primary">上传并识别</button>
+      </form>
+      <div class="hint" style="margin:12px 0 0">支持 HTML 报告、CSV / TSV、Excel（XLSX）和 JSON。文件会上传到服务器，按内容哈希去重，并将识别结果加入「模型对比」。</div>
+    </div>
+    <div class="hint">扫描服务器已有资料目录（<span class="code">${esc(scan.root)}</span>）并登记为测试项目。原目录文件不移动、不修改。</div>
     <div class="card">
       <form class="row" onsubmit="return doImport(event)">
         <div class="field" style="flex:1"><label>旧资料根目录</label><input id="i_root" style="width:100%;min-width:320px" value="${esc(scan.root)}"></div>
@@ -945,9 +994,10 @@ async function viewItemFiles(i) {
   const it = window._scanItems[i];
   if (!it) return;
   let d;
-  try { d = await api("/import/item-files", { method: "POST", body: JSON.stringify({ name: it.name }) }); }
+  try { d = await api("/import/item-files", { method: "POST", body: JSON.stringify({ root: state.legacyRoot, name: it.name }) }); }
   catch (err) { toast(err.message); return; }
   window._itemFiles = d.files;
+  window._itemRoot = state.legacyRoot;
   const kinds = {};
   d.files.forEach(f => kinds[f.kind] = (kinds[f.kind] || 0) + 1);
   const summary = Object.entries(kinds).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}×${v}`).join(" · ");
@@ -963,32 +1013,64 @@ async function previewItemFile(j) {
   const f = window._itemFiles[j];
   if (!f) return;
   let d;
-  try { d = await api(`/files/preview?path=${encodeURIComponent(f.rel_path)}`); }
+  try { d = await api(`/files/preview?path=${encodeURIComponent(f.rel_path)}&root=${encodeURIComponent(window._itemRoot || "")}`); }
   catch (err) { toast(err.message); return; }
+  d.download_url = `${API}/files/download?path=${encodeURIComponent(f.rel_path)}&root=${encodeURIComponent(window._itemRoot || "")}`;
   showPreviewModal(d);
 }
 window.previewItemFile = previewItemFile;
 async function openItemFile(j) {
   const f = window._itemFiles[j];
   if (!f) return;
-  try { await api(`/files/open?path=${encodeURIComponent(f.rel_path)}`, { method: "POST" }); toast("已用系统默认软件打开"); }
-  catch (err) { toast(err.message); }
+  window.open(`${API}/files/download?path=${encodeURIComponent(f.rel_path)}&root=${encodeURIComponent(window._itemRoot || "")}`, "_blank", "noopener");
 }
 window.openItemFile = openItemFile;
 function showPreviewModal(d) {
   let body;
   if (d.kind === "text") {
-    body = `<pre class="fileview">${esc(d.content)}</pre>` +
-      (d.truncated ? '<div class="hint" style="margin-top:6px">文件较大，仅显示前 200KB，完整内容请用「打开」。</div>' : "");
+    body = `<pre id="previewContent" class="fileview preview-text">${esc(d.content)}</pre>` +
+      (d.truncated ? '<div class="hint" style="margin-top:6px;flex:none">文件较大，仅显示前 200KB，完整内容请下载。</div>' : "");
+  } else if (d.kind === "html") {
+    body = `<div class="preview-content"><iframe id="previewFrame" title="HTML 测试报告预览" sandbox="" referrerpolicy="no-referrer"></iframe></div>`;
   } else if (d.kind === "image") {
     body = `<img src="${d.data}" alt="预览" style="max-width:100%;border:1px solid var(--border);border-radius:8px">`;
   } else {
-    body = `<div class="hint">二进制文件（${(d.size/1024).toFixed(1)} KB），无法在线预览，请点「打开」用对应软件查看。</div>`;
+    body = `<div class="hint">二进制文件（${(d.size/1024).toFixed(1)} KB），无法在线预览，请下载后用对应软件查看。</div>`;
   }
-  openModal(`<h3 class="code" style="font-size:15px">${esc(d.name)}</h3>${body}
+  openModal(`<h3 class="code" style="font-size:15px">${esc(d.name)}</h3>
+    <div class="preview-toolbar"><label for="previewFont">字体</label><input id="previewFont" type="range" min="10" max="28" value="14" oninput="setPreviewFont(this.value)"><output id="previewFontValue">14px</output><button class="btn small" type="button" onclick="togglePreviewMax()" title="最大化预览" aria-label="最大化预览"><i data-lucide="maximize-2" aria-hidden="true"></i></button><button class="btn small" type="button" onclick="downloadPreviewFile()" title="下载原文件" aria-label="下载原文件"><i data-lucide="download" aria-hidden="true"></i></button></div>${body}
     <div class="foot"><button class="btn" onclick="closeModal()">关闭</button></div>`);
+  $("#modalBox").classList.add("preview-modal");
+  window._previewData = d;
+  window.lucide?.createIcons({attrs:{"stroke-width":1.65,"aria-hidden":"true"}});
+  setPreviewFont(14);
 }
 window.showPreviewModal = showPreviewModal;
+function previewDocument(html, size) {
+  const policy = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; base-uri 'none'; form-action 'none'">`;
+  const safe = String(html || "").replace(/<script\b[\s\S]*?<\/script\s*>/gi, "").replace(/<iframe\b[\s\S]*?<\/iframe\s*>/gi, "");
+  const style = `<style>html{font-size:${size}px !important}body{font-size:1em !important;line-height:1.6 !important;overflow-wrap:anywhere}</style>`;
+  return safe.replace(/<head([^>]*)>/i, `<head$1>${policy}${style}`) || `${policy}${style}${safe}`;
+}
+function setPreviewFont(size) {
+  const value = Math.max(10, Math.min(28, Number(size) || 14));
+  if ($("#previewFontValue")) $("#previewFontValue").textContent = `${value}px`;
+  const frame = $("#previewFrame");
+  if (frame) {
+    frame.srcdoc = previewDocument(window._previewData?.content || "", value);
+  } else {
+    const text = $("#previewContent");
+    if (!text) return;
+    text.style.fontSize = `${value}px`;
+  }
+}
+window.setPreviewFont = setPreviewFont;
+function togglePreviewMax() { $("#modalBox").classList.toggle("is-max"); }
+function downloadPreviewFile() {
+  const d = window._previewData;
+  if (d?.download_url) window.open(d.download_url, "_blank", "noopener");
+  else toast("当前文件来自旧资料目录，请在内容列表中点下载");
+}
 async function doImport(e) {
   e.preventDefault();
   const folders = [...document.querySelectorAll(".imp-check:checked")].map(c => c.value);

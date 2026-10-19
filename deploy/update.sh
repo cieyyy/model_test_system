@@ -29,6 +29,25 @@ marker=/etc/model-test/maintenance
 backup=/var/backups/model-test/$(date -u +%Y%m%dT%H%M%SZ)-${revision:0:8}
 switched=0
 stopped=0
+
+prune_history() {
+    local current_release previous_release keep dir
+    current_release=$(readlink -f "$base/current" || true)
+    keep=0
+    while read -r dir; do
+        [[ -n "$dir" ]] || continue
+        [[ "$dir" == "$current_release" || "$dir" == "$previous" ]] && continue
+        keep=$((keep + 1))
+        (( keep <= 2 )) || rm -rf -- "$dir"
+    done < <(find "$base/releases" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' | sort -rn | cut -d' ' -f2-)
+
+    keep=0
+    while read -r dir; do
+        [[ -n "$dir" ]] || continue
+        keep=$((keep + 1))
+        (( keep <= 5 )) || rm -rf -- "$dir"
+    done < <(find /var/backups/model-test -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' | sort -rn | cut -d' ' -f2-)
+}
 finish() {
     result=$?
     trap - EXIT
@@ -72,6 +91,7 @@ switched=1
 systemctl start model-test
 for attempt in {1..30}; do
     if curl --fail --silent http://127.0.0.1:8032/api/health >/dev/null; then
+        prune_history
         echo "Running $revision. Backup: $backup"
         exit 0
     fi

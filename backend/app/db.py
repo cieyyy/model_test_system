@@ -122,7 +122,7 @@ class TestProject(Base):
 
 
 class ImportedAsset(Base):
-    """从旧目录登记的脚本 / 结果 / 报告文件（只读引用，不移动不复制）。"""
+    """测试资产索引；上传资产使用内容寻址存储，重复内容只保留一份。"""
 
     __tablename__ = "imported_assets"
 
@@ -131,6 +131,8 @@ class ImportedAsset(Base):
     rel_path: Mapped[str] = mapped_column(Text)  # 相对旧资料根目录
     file_kind: Mapped[str] = mapped_column(default="other")  # script/json/table/html/doc/other
     size_bytes: Mapped[int] = mapped_column(default=0)
+    sha256: Mapped[str] = mapped_column(default="")
+    storage_path: Mapped[str] = mapped_column(Text, default="")  # 相对 DATA_DIR；旧目录资产为空
     created_at: Mapped[str] = mapped_column(DateTime, default=_now)
 
     project: Mapped[TestProject] = relationship(back_populates="assets")
@@ -230,6 +232,11 @@ def init_db() -> None:
             conn.execute(text("ALTER TABLE test_projects ADD COLUMN script_dir TEXT NOT NULL DEFAULT ''"))
         if "exec_mode" not in pcols:
             conn.execute(text("ALTER TABLE test_projects ADD COLUMN exec_mode TEXT NOT NULL DEFAULT 'builtin'"))
+        acols = [row[1] for row in conn.execute(text("PRAGMA table_info(imported_assets)"))]
+        if "sha256" not in acols:
+            conn.execute(text("ALTER TABLE imported_assets ADD COLUMN sha256 TEXT NOT NULL DEFAULT ''"))
+        if "storage_path" not in acols:
+            conn.execute(text("ALTER TABLE imported_assets ADD COLUMN storage_path TEXT NOT NULL DEFAULT ''"))
         # 阶段 4 迁移：model_name 全局唯一 → (provider_id, model_name) 组合唯一。
         # 旧表带有 UNIQUE(model_name) 自约束，需重建表；legacy_alter_table=ON 保证
         # RENAME 时其他表（test_projects）的外键引用不被改写。

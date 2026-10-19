@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .api import router
+from .record_imports import router as import_router
 from .db import BASE_DIR, init_db
 from .suite_api import router as suite_router
 from .suite_reports import router as report_router
@@ -50,6 +51,7 @@ def deployment_status():
     return dict(mutating_requests=app.state.mutating_requests, active_jobs=suites + legacy)
 
 app.include_router(router)
+app.include_router(import_router)
 app.include_router(suite_router)
 app.include_router(report_router)
 
