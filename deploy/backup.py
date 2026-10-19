@@ -11,6 +11,7 @@ destination.mkdir(parents=True, exist_ok=False)
 
 def immutable_copy(src, dst):
     """Use hardlinks for append-free evidence/object files on the same volume."""
+    src, dst = Path(src), Path(dst)
     try:
         dst.parent.mkdir(parents=True, exist_ok=True)
         os.link(src, dst)
