@@ -7,7 +7,7 @@ const reportApi=(path,body)=>api('/suite-reports'+path,body===undefined?{}:{meth
 async function renderEditableReports() {
   const items=await reportApi('');
   if(!$('#editableReportList'))return;
-  $('#editableReportList').innerHTML=`<div class="suite-section"><h2>可编辑报告</h2>${items.length?`<div class="suite-preview"><table><thead><tr><th>报告</th><th>版本</th><th>创建时间</th><th></th></tr></thead><tbody>${items.map(r=>`<tr><td>${esc(r.title)}</td><td>v${r.version}</td><td>${esc(r.created_at.replace('T',' ').slice(0,19))}</td><td><button class="btn small" onclick="reportOpen(${r.id})">预览与编辑</button></td></tr>`).join('')}</tbody></table></div>`:'<p class="suite-note">测试结束后自动生成，也可从历史运行生成。</p>'}</div>`;
+  $('#editableReportList').innerHTML=items.length?`<div class="suite-report-versions"><div class="suite-preview"><table><thead><tr><th>测试报告</th><th>版本</th><th>创建时间</th><th></th></tr></thead><tbody>${items.map(r=>`<tr><td>${esc(r.title)}</td><td>v${r.version}</td><td>${esc(r.created_at.replace('T',' ').slice(0,19))}</td><td><button class="btn small" onclick="reportOpen(${r.id})">预览与编辑</button></td></tr>`).join('')}</tbody></table></div></div>`:'';
 }
 async function reportFromJob(job) {await reportCreate({job_id:job});}
 async function reportFromRuns(ids) {await reportCreate({run_ids:ids});}

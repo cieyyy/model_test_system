@@ -211,7 +211,7 @@ const suiteCategory = id => ['benchmark','fixed_rate','tpm_benchmark','stream_me
 async function renderSuiteReports() {
   clearTimeout(suitePoll);
   suiteGeneration++;
-  $('#main').innerHTML=studioHeading('reports')+'<div id="suiteError" class="suite-error"></div><div id="suiteReportList"></div><div id="editableReportList"></div><section id="reportEditor"></section><section id="suiteReport"></section>';
+  $('#main').innerHTML=studioHeading('reports')+'<div id="suiteError" class="suite-error"></div><div id="suiteReportList"></div><section id="reportEditor"></section><section id="suiteReport"></section>';
   try {
     const [runs,legacy,catalog]=await Promise.all([api('/suites/runs'),api('/suites/legacy-reports'),api('/suites')]);
     if(state.tab!=='reports') return;
@@ -221,7 +221,7 @@ async function renderSuiteReports() {
       <div class="suite-metrics">${groups.map(group=>`<div><b>${runs.filter(r=>suiteCategory(r.suite_id)===group).length}</b><span>${group}</span></div>`).join('')}</div>
       <div class="suite-form"><div class="field"><label for="reportCategory">测试分类</label><select id="reportCategory" onchange="suiteReportRecords()"><option value="">全部测试项目</option>${groups.map(g=>`<option>${g}</option>`).join('')}</select></div><div class="field"><label for="reportRunSearch">搜索测试结果</label><input id="reportRunSearch" type="search" placeholder="项目、模型或运行编号" oninput="suiteReportRecords()"></div></div>
       <div id="suiteRunRecords"></div>
-      ${legacy.length?`<section class="suite-section"><h3>历史压测报告</h3><div class="suite-links">${legacy.map(r=>`<button class="btn small" onclick="suiteImport('${esc(r.id)}')">${esc(r.model)} · ${esc(r.id)}</button>`).join('')}</div></section>`:''}`;
+      ${legacy.length?`<section class="suite-section"><h3>历史压测报告</h3><div class="suite-links">${legacy.map(r=>`<button class="btn small" onclick="suiteImport('${esc(r.id)}')">${esc(r.model)} · ${esc(r.id)}</button>`).join('')}</div></section>`:''}<div id="editableReportList"></div>`;
     suiteReportRecords();
     await renderEditableReports();
   } catch(e) {suiteError(e);}
