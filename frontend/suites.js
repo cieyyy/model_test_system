@@ -206,6 +206,7 @@ async function suiteWatch(id,generation) {
 }
 async function suiteCancel(id) { try {await suitePost('/jobs/'+id+'/cancel');toast('已请求取消');} catch(e) {suiteError(e);} }
 let suiteReportRuns=[];
+let suiteReportExpanded=false;
 const suiteCategory = id => ['benchmark','fixed_rate','tpm_benchmark','stream_metrics','ttft_long_context','latency','text_peak','rate_cache_metrics'].includes(id)?'性能与限流':['api_features','video_understanding','mixed_vision','body_100mb'].includes(id)?'多模态与媒体':['long_conversation','kvv_rounds','long_output','cache','context','stability'].includes(id)?'上下文与稳定性':['acceptance','az_probe'].includes(id)?'验收与渠道':'功能与协议';
 async function renderSuiteReports() {
   clearTimeout(suitePoll);
@@ -240,14 +241,15 @@ async function suiteOpenReport(id) { state.tab='reports'; history.replaceState(n
 async function suiteShowReport(id) {
   try {
     const r=await api('/suites/runs/'+id);
+    suiteReportExpanded=true;
     const html=r.files.find(f=>f.path==='report.html'||f.path.endsWith('/report.html'));
     const fileUrl=p=>'/api/suites/runs/'+id+'/files/'+p.split('/').map(encodeURIComponent).join('/');
-    $('#suiteReport').innerHTML=`<div class="suite-section"><div class="suite-toolbar"><h2>#${r.id} · ${esc(r.name)} ${r.demo?'<span class="tag warn">模拟数据</span>':''}</h2><button class="btn primary" onclick="reportFromRuns([${r.id}])">自定义报告</button><button class="btn" onclick="reportFromJob('${esc(r.job_id)}')">任务汇总报告</button></div><div class="suite-status">${esc(r.model)} · ${suiteStatus(r.status)} · ${esc(r.verdict)}</div>
+    $('#suiteReport').innerHTML=`<div class="suite-section"><div class="suite-toolbar"><h2>#${r.id} · ${esc(r.name)} ${r.demo?'<span class="tag warn">模拟数据</span>':''}</h2><button class="btn primary" onclick="reportFromRuns([${r.id}])">自定义报告</button><button class="btn" onclick="reportFromJob('${esc(r.job_id)}')">任务汇总报告</button><button id="suiteReportToggle" class="btn" onclick="suiteToggleReport()" aria-expanded="true">收起报告</button></div><div class="suite-status">${esc(r.model)} · ${suiteStatus(r.status)} · ${esc(r.verdict)}</div>
       ${r.suite_id!=='benchmark'?suiteSourceMetrics(r):''}
       ${r.suite_id==='benchmark'?'<p class="suite-note">TTFT：首个正文或思考片段；TPM：全程折算；百分位：线性插值。未知 Usage 显示为空，不按 0 计算。</p>':''}
-      <div id="suiteFullReport"></div>
+      <div id="suiteReportContent" class="suite-report-content"><div id="suiteFullReport"></div>
       ${html?`<p><a class="btn small" href="${fileUrl(html.path)}" target="_blank" rel="noopener">源脚本 HTML 报告</a></p>`:''}
-      <details><summary>配置与全部证据（${r.files.length}）</summary><pre class="mono">${esc(JSON.stringify(r.config,null,2))}</pre><div class="suite-links">${r.files.map(f=>`<a href="${fileUrl(f.path)}" target="_blank" rel="noopener">${esc(f.path)} (${suiteNumber(f.bytes)} B)</a>`).join('')}</div></details></div>`;
+      <details><summary>配置与全部证据（${r.files.length}）</summary><pre class="mono">${esc(JSON.stringify(r.config,null,2))}</pre><div class="suite-links">${r.files.map(f=>`<a href="${fileUrl(f.path)}" target="_blank" rel="noopener">${esc(f.path)} (${suiteNumber(f.bytes)} B)</a>`).join('')}</div></details></div></div>`;
     if(r.suite_id==='benchmark') await workspaceBenchmark($('#suiteFullReport'),r.id,false);
     else if(!['running','queued'].includes(r.status)) {
       const report=await reportApi('',{run_ids:[r.id]});
@@ -255,6 +257,17 @@ async function suiteShowReport(id) {
     } else $('#suiteFullReport').innerHTML='<p class="suite-note">测试执行中，结束后生成测试报告。</p>';
     $('#suiteReport').scrollIntoView({behavior:'smooth',block:'start'});
   } catch(e) {suiteError(e);}
+}
+function suiteToggleReport() {
+  if(!$('#suiteReportContent')) return;
+  suiteReportExpanded=!suiteReportExpanded;
+  $('#suiteReportContent').hidden=!suiteReportExpanded;
+  const button=$('#suiteReportToggle');
+  if(button) {
+    button.textContent=suiteReportExpanded?'收起报告':'查看报告';
+    button.setAttribute('aria-expanded',String(suiteReportExpanded));
+    button.title=suiteReportExpanded?'收起当前报告':'查看当前报告';
+  }
 }
 function suiteSourceMetrics(r) {
   const counts={};let total=0;

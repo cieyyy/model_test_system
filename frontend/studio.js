@@ -25,7 +25,7 @@ function studioHeading(view) {
 const studioCommandIcons={
   '新建测试':'plus','一键测试全部项目':'list-checks','预览计划':'scan-line','执行计划':'play','运行本地模拟':'play',
   '刷新报告':'refresh-cw','刷新记录':'refresh-cw','查看结果':'arrow-up-right','运行证据':'folder-open','取消测试':'square','保存新版本':'save','恢复保存版本':'rotate-ccw',
-  '新增行':'plus','收起':'chevron-up','恢复本机默认值':'rotate-ccw','HTML':'file-code-2','Excel / CSV':'sheet','JSON':'braces',
+  '新增行':'plus','查看报告':'eye','收起':'chevron-up','收起报告':'chevron-up','恢复本机默认值':'rotate-ccw','HTML':'file-code-2','Excel / CSV':'sheet','JSON':'braces',
 };
 function studioDecorate() {
   document.querySelectorAll('.suite-config-icon:not([data-studio-icon])').forEach(button=>{
