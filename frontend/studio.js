@@ -17,7 +17,7 @@ function studioToggleTheme() {
   studioRefreshTheme();
 }
 function studioHeading(view) {
-  const pages={dashboard:['01','PERFORMANCE','压测展示台'],history:['02','TEST HISTORY','测试记录'],suites:['NEW','MODEL TEST','新建测试'],reports:['03','TEST REPORTS','测试报告']};
+  const pages={dashboard:['02','PERFORMANCE','数据展示'],history:['03','TEST HISTORY','测试记录'],suites:['01','MODEL TEST','新建测试'],reports:['03','TEST REPORTS','测试报告']};
   const [index,label,title]=pages[view];
   const date=new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
   return `<div class="studio-page-heading"><div><div class="studio-eyebrow"><span>${index}</span>${label}</div><h2>${title}<span class="studio-title-dot" aria-hidden="true">.</span></h2></div><div class="studio-date">${date}<span>MODEL TEST WORKSPACE</span></div></div>`;
