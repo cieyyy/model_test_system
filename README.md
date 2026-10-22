@@ -5,6 +5,7 @@
 ## Docker 部署
 
 所有常驻服务统一使用 Docker Compose：
+
 - app：Python 3.12 + FastAPI / Uvicorn，包含前端和全部测试脚本，单 worker、非 root 运行。
 - proxy：Nginx，负责 HTTPS、登录认证、上传和长连接代理，仅对公网开放 80/443。
 - certbot：检查并续期 Let's Encrypt IPv4 短期证书，每 6 小时检查，失败后 30 分钟重试。Nginx 检测证书变化后自动重载。
@@ -36,7 +37,7 @@ bash /opt/model-test/repository/deploy/install.sh YOUR_SERVER_IP
 
 原路径直接挂载进容器，历史证据中的绝对路径仍然有效。全部业务数据位于镜像之外；更新不会覆盖，`model-test-ctl down` 也不会删除。不得删除 secret.key，否则无法解密已保存的 API Key。
 
-只保留当前与前一版应用镜像／代码，以及最近 5 份更新快照。不可变证据和导入对象使用硬链接备份，避免多份复制；容器日志每个服务最多 2 × 5MB，临时目录在内存中并设定上限。不会执行影响其他项目的 `docker system prune`。Docker 基础镜像和构建缓存可由 `docker system df` 查看，平台不清理其他项目的缓存。
+只保留当前与前一版应用镜像／代码，以及最近 5 份更新快照。不可变证据和导入对象使用硬链接备份，避免多份复制；容器日志每个服务最多 2 × 5MB，临时目录在内存中并设定上限。Nginx 固定使用两个 worker，上传流式转发，避免大文件落入临时目录。不会执行影响其他项目的 `docker system prune`。Docker 基础镜像和构建缓存可由 `docker system df` 查看，平台不清理其他项目的缓存。
 
 ## 日常迭代
 

@@ -22,6 +22,7 @@ RUN pip install --disable-pip-version-check -r /app/backend/requirements.lock
 COPY backend/ /app/backend/
 COPY frontend/ /app/frontend/
 COPY test-scripts/ /app/test-scripts/
+COPY docs/models/ /app/docs/models/
 RUN mkdir -p /app/test-scripts/standalone-acceptance/fixtures /var/lib/model-test \
     && chown model-test:model-test /var/lib/model-test
 USER model-test

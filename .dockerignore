@@ -6,6 +6,9 @@
 !frontend/**
 !test-scripts/
 !test-scripts/**
+!docs/
+!docs/models/
+!docs/models/**
 **/.venv
 **/__pycache__
 **/*.pyc

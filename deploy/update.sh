@@ -37,14 +37,14 @@ printf 'MT_VERSION=%s\nAPP_UID=%s\nAPP_GID=%s\n' "$revision" \
     "$(stat -c %u /var/lib/model-test)" "$(stat -c %g /var/lib/model-test)" > "$runtime"
 compose() { docker compose --env-file "$runtime" -f "$release/compose.yaml" "$@"; }
 compose config --quiet
-compose pull proxy certbot
+compose pull --quiet proxy certbot
 compose build app
 image=local/model-test:$revision
 # No production database or credentials are mounted in the offline test runner.
 docker run --rm --entrypoint /bin/sh --tmpfs /tmp:rw,size=256m,mode=1777 \
     -e MT_RESULT_ROOT=/tmp/results -e TIKTOKEN_CACHE_DIR=/tmp/tiktoken \
     -v /var/lib/model-test/acceptance-fixtures:/app/test-scripts/standalone-acceptance/fixtures:ro \
-    "$image" -ec 'python -m unittest -q test_suites; cd /app/test-scripts/llm-benchmark; python -m unittest discover -q -s tests'
+    "$image" -ec 'python -m unittest -q test_suites; cd /app/test-scripts/llm-benchmark; python -m unittest discover -q -s tests; test -r /app/docs/models/模版.html; test -r /app/docs/models/测试结果模板.xlsx'
 
 marker=$config/maintenance
 backup=/var/backups/model-test/$(date -u +%Y%m%dT%H%M%SZ)-${revision:0:8}
