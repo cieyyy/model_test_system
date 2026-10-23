@@ -2,14 +2,14 @@ const localFolders = new Map();
 const folderIgnored = new Set(['.git', '.venv', 'venv', 'node_modules', '__pycache__', '.DS_Store']);
 
 function openFolderPicker() { openFolderPickerFor('i_root'); }
-function openFolderPickerFor(inputId) {
+function openFolderPickerFor(inputId, filesOnly = false) {
   if (localFolders.get(inputId)?.upload) { toast('正在上传文件夹，请稍后'); return; }
   const target = document.getElementById(inputId);
   if (!target) return;
   const picker = document.createElement('input');
   picker.type = 'file';
   picker.multiple = true;
-  picker.setAttribute('webkitdirectory', '');
+  if (!filesOnly) picker.setAttribute('webkitdirectory', '');
   picker.hidden = true;
   document.body.appendChild(picker);
   picker.addEventListener('cancel', () => picker.remove(), {once:true});
@@ -21,11 +21,15 @@ function openFolderPickerFor(inputId) {
       if (files.length > 2000 || files.some(file => file.size > 32 * 1048576) || files.reduce((sum,file) => sum + file.size, 0) > 100 * 1048576) {
         toast('文件夹限 2000 个文件、合计 100 MB，单文件不超过 32 MB', 5000); return;
       }
-      const name = files[0].webkitRelativePath.split('/')[0];
-      localFolders.set(inputId, {input:target, files, name});
+      const name = filesOnly ? (files.length === 1 ? files[0].name : '所选脚本文件') : files[0].webkitRelativePath.split('/')[0];
+      const rawArchive = filesOnly && files.length === 1 && /\.zip$/i.test(files[0].name);
+      const scriptCount = files.filter(file => /\.(pyw?|sh|bash|[cm]?js)$/i.test(file.name)).length;
+      localFolders.set(inputId, {input:target, files, name, filesOnly, rawArchive});
       target.value = '';
       const label = document.getElementById(inputId + '_label');
       if (label) label.value = `${name} · ${files.length} 个文件（待上传）`;
+      const analysis = document.getElementById(inputId + '_analysis');
+      if (analysis) analysis.textContent = rawArchive ? 'ZIP 压缩包 · 上传后识别' : `已选 ${files.length} 个文件 · ${scriptCount} 个脚本候选`;
       if (inputId === 'i_root') {
         target.value = name;
         state.legacyRoot = await uploadSelectedFolder(inputId);
@@ -47,16 +51,23 @@ async function uploadSelectedFolder(inputId) {
     const label = document.getElementById(inputId + '_label') || target;
     label.value = `${selection.name} · 正在上传…`;
     const entries = Object.create(null);
-    for (const file of selection.files) entries[file.webkitRelativePath] = new Uint8Array(await file.arrayBuffer());
-    const archive = await new Promise((resolve,reject) => fflate.zip(entries, {level:1}, (error,data) => error ? reject(error) : resolve(data)));
-    const response = await fetch('/api/files/upload-folder', {method:'POST', headers:{'Content-Type':'application/zip'}, body:archive});
+    let archive;
+    if (selection.rawArchive) archive = selection.files[0];
+    else {
+      for (const file of selection.files) entries[selection.filesOnly ? `selected-scripts/${file.name}` : file.webkitRelativePath] = new Uint8Array(await file.arrayBuffer());
+      archive = await new Promise((resolve,reject) => fflate.zip(entries, {level:1}, (error,data) => error ? reject(error) : resolve(data)));
+    }
+    const response = await fetch('/api/files/upload-folder' + (selection.rawArchive ? '?archive=true' : ''), {method:'POST', headers:{'Content-Type':'application/zip'}, body:archive});
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
       throw new Error(error.detail || (response.status === 401 ? '登录已过期，请重新登录后上传' : '文件夹上传失败，请重试'));
     }
     const result = await response.json();
     target.value = result.path;
-    label.value = inputId === 'i_root' ? result.path : `${result.name} · ${result.file_count} 个文件`;
+    label.value = inputId === 'i_root' ? result.path : `${selection.name} · ${result.script_count} 个脚本`;
+    target.dataset.scriptCount = result.script_count;
+    target.dataset.runnableCount = result.runnable_count;
+    showScriptRecognition(inputId, result);
     localFolders.delete(inputId);
     return result.path;
   })();
@@ -67,4 +78,19 @@ async function uploadSelectedFolder(inputId) {
     if (label) label.value = `${selection.name} · 上传失败，可重试`;
     throw error;
   }
+}
+
+function showScriptRecognition(inputId, result) {
+  const analysis = document.getElementById(inputId + '_analysis');
+  if (!analysis) return;
+  analysis.replaceChildren();
+  const summary = document.createElement('div');
+  summary.textContent = `已识别 ${result.script_count} 个脚本 · ${result.runnable_count} 个可运行 · ${result.other_count} 个配套文件`;
+  analysis.append(summary);
+  for (const script of result.scripts.slice(0, 8)) {
+    const line = document.createElement('div');
+    line.textContent = `${script.name} · ${script.language}${script.reason ? ' · ' + script.reason : ''}`;
+    analysis.append(line);
+  }
+  if (!result.script_count) summary.textContent = '未识别到测试脚本；配套文件已保留';
 }

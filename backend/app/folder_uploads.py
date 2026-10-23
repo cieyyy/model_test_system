@@ -15,6 +15,7 @@ from fastapi import APIRouter, HTTPException, Request
 from starlette.concurrency import run_in_threadpool
 
 from .db import DATA_DIR
+from .script_catalog import discover_scripts
 
 router = APIRouter(prefix="/api/files")
 MAX_ARCHIVE = 120 * 1024 * 1024
@@ -37,7 +38,7 @@ def _matches(directory: Path, manifest: list[tuple[str, int, str]]) -> bool:
     return True
 
 
-def unpack_folder(archive: Path, storage: Path) -> dict:
+def unpack_folder(archive: Path, storage: Path, archive_upload: bool = False) -> dict:
     with tempfile.TemporaryDirectory(prefix=".extract-", dir=storage) as temporary:
         stage = Path(temporary) / "content"
         stage.mkdir()
@@ -57,6 +58,9 @@ def unpack_folder(archive: Path, storage: Path) -> dict:
                             or any(ord(char) < 32 for char in name) or len(name.encode("utf-8")) > 2048
                             or kind not in (0, stat.S_IFREG, stat.S_IFDIR)):
                         raise HTTPException(400, "文件夹中包含不支持的路径或链接")
+                    if archive_upload:
+                        parts = ["uploaded-scripts", *parts]
+                        name = "/".join(parts)
                     relative = PurePosixPath(name).as_posix()
                     roots.add(parts[0])
                     if item.is_dir():
@@ -95,15 +99,16 @@ def unpack_folder(archive: Path, storage: Path) -> dict:
             if not reused:
                 stage.rename(destination)
         root = next(iter(roots))
-        return {"path": str(destination / root), "name": root, "file_count": len(manifest), "size_bytes": total, "reused": reused}
+        return {"path": str(destination / root), "name": root, "size_bytes": total, "reused": reused,
+                **discover_scripts(destination / root)}
 
 
 @router.post("/upload-folder")
-async def upload_folder(request: Request):
+async def upload_folder(request: Request, archive: bool = False):
     storage = DATA_DIR / "script_uploads"
     storage.mkdir(exist_ok=True)
     descriptor, filename = tempfile.mkstemp(prefix=".upload-", suffix=".zip", dir=storage)
-    archive = Path(filename)
+    archive_path = Path(filename)
     try:
         total = 0
         with os.fdopen(descriptor, "wb") as destination:
@@ -112,6 +117,6 @@ async def upload_folder(request: Request):
                 if total > MAX_ARCHIVE:
                     raise HTTPException(413, "上传文件夹过大，合计不能超过 100 MB")
                 destination.write(chunk)
-        return await run_in_threadpool(unpack_folder, archive, storage)
+        return await run_in_threadpool(unpack_folder, archive_path, storage, archive)
     finally:
-        archive.unlink(missing_ok=True)
+        archive_path.unlink(missing_ok=True)

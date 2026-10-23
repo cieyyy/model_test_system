@@ -121,7 +121,7 @@
 
 <script src="/static/vendor/lucide.min.js"></script>
 <script src="/static/vendor/fflate.min.js?v=0.8.2"></script>
-<script src="/static/folder-upload.js?v=20261023-local-folder"></script>
+<script src="/static/folder-upload.js?v=20261023-script-recognition"></script>
 <script src="/static/studio.js?v=20261023-browser-login"></script>
 <script src="/static/suites.js?v=20261020-report-toggle"></script>
 <script src="/static/reports.js?v=20261020-report-grouping"></script>
@@ -480,10 +480,10 @@ function renderProjects() {
         <div class="field"><label>模型</label><select id="j_model">${modelOpts}</select></div>
         <div class="field"><label>执行模式</label><select id="j_exec_mode" onchange="toggleExecMode('j')">
           <option value="builtin">标准测试（chat/stream/json/tools）</option>
-          <option value="script">上传脚本文件夹</option></select></div>
-        <div class="field" id="j_script_dir_wrap" style="display:none"><label>脚本文件夹</label>
-          <input id="j_script_dir" type="hidden"><div style="display:flex;gap:8px"><input id="j_script_dir_label" style="flex:1;min-width:0" readonly placeholder="选择电脑上的脚本文件夹">
-          <button class="btn small" type="button" onclick="openFolderPickerFor('j_script_dir')">浏览…</button></div></div>
+          <option value="script">上传测试脚本</option></select></div>
+        <div class="field" id="j_script_dir_wrap" style="display:none"><label>测试脚本</label>
+          <input id="j_script_dir" type="hidden"><div style="display:flex;gap:8px;flex-wrap:wrap"><input id="j_script_dir_label" style="flex:1;min-width:120px" readonly placeholder="选择文件、ZIP 或文件夹">
+          <button class="btn small" type="button" onclick="openFolderPickerFor('j_script_dir',true)">选文件</button><button class="btn small" type="button" onclick="openFolderPickerFor('j_script_dir')">选文件夹</button></div><div id="j_script_dir_analysis" class="hint" style="overflow-wrap:anywhere;margin-top:8px"></div></div>
         <div class="field"><label>自定义命令</label><input id="j_cmd" placeholder="脚本模式下可填一次性命令（留空则跑文件夹内脚本）"></div>
         <button class="btn primary">登记项目</button>
       </form>
@@ -502,7 +502,7 @@ async function createProject(e) {
       script_path: "", command: $("#j_cmd").value.trim(),
       script_dir: $("#j_script_dir").value.trim(), exec_mode: $("#j_exec_mode").value,
     })});
-    toast("已登记"); render();
+    toast($('#j_exec_mode').value === 'script' && $('#j_script_dir').dataset.scriptCount !== undefined ? `已登记 · 识别 ${$('#j_script_dir').dataset.scriptCount} 个脚本，${$('#j_script_dir').dataset.runnableCount} 个可运行` : '已登记', 5000); render();
   } catch (err) { toast(err.message); }
   finally { if (button) button.disabled = false; }
   return false;
@@ -528,15 +528,16 @@ function editProject(id) {
     <div class="field" style="margin-bottom:10px"><label>模型</label><select id="ej_model" style="width:100%">${modelOpts}</select></div>
     <div class="field" style="margin-bottom:10px"><label>执行模式</label><select id="ej_exec_mode" style="width:100%" onchange="toggleExecMode('ej')">
       <option value="builtin" ${p.exec_mode !== "script" ? "selected" : ""}>标准测试（chat/stream/json/tools）</option>
-      <option value="script" ${p.exec_mode === "script" ? "selected" : ""}>上传脚本文件夹</option></select></div>
-    <div class="field" style="margin-bottom:10px" id="ej_script_dir_wrap"><label>脚本文件夹</label>
-      <input id="ej_script_dir" type="hidden" value="${esc(p.script_dir)}"><div style="display:flex;gap:8px"><input id="ej_script_dir_label" value="${esc(p.script_dir.split(/[\\/]/).filter(Boolean).pop() || '')}" style="flex:1;min-width:0" readonly placeholder="选择电脑上的脚本文件夹">
-      <button class="btn small" type="button" onclick="openFolderPickerFor('ej_script_dir')">浏览…</button></div></div>
+      <option value="script" ${p.exec_mode === "script" ? "selected" : ""}>上传测试脚本</option></select></div>
+    <div class="field" style="margin-bottom:10px" id="ej_script_dir_wrap"><label>测试脚本</label>
+      <input id="ej_script_dir" type="hidden" value="${esc(p.script_dir)}"><div style="display:flex;gap:8px;flex-wrap:wrap"><input id="ej_script_dir_label" value="${esc(p.script_dir.split(/[\\/]/).filter(Boolean).pop() || '')}" style="flex:1;min-width:120px" readonly placeholder="选择文件、ZIP 或文件夹">
+      <button class="btn small" type="button" onclick="openFolderPickerFor('ej_script_dir',true)">选文件</button><button class="btn small" type="button" onclick="openFolderPickerFor('ej_script_dir')">选文件夹</button></div><div id="ej_script_dir_analysis" class="hint" style="overflow-wrap:anywhere;margin-top:8px"></div></div>
     <div class="field" style="margin-bottom:10px"><label>自定义命令</label><input id="ej_cmd" value="${esc(p.command)}" style="width:100%"></div>
     <div class="hint">来源：${esc(p.source === "imported" ? "旧资料导入" : "手动登记")} · 资产文件 ${p.asset_count} 个（只读引用）。导入的项目编辑分类并启用后即可执行。</div>
     <div class="foot"><button class="btn" onclick="closeModal()">取消</button>
     <button class="btn primary" id="ej_save" onclick="saveProject(${id})">保存修改</button></div>`);
   toggleExecMode('ej');
+  if (p.script_dir) api(`/projects/${id}/scripts`).then(result => { if ($('#ej_script_dir')?.value === p.script_dir) showScriptRecognition('ej_script_dir', result); }).catch(() => {});
 }
 window.editProject = editProject;
 async function saveProject(id) {
@@ -674,15 +675,15 @@ async function renderScriptPanel(projId) {
     const rows = scripts.length ? scripts.map(s => `
       <tr>
         <td class="code">${esc(s.name)}</td>
-        <td>${s.ext}</td>
+        <td>${esc(s.language || s.ext)}</td>
         <td>${(s.size / 1024).toFixed(1)} KB</td>
         <td>${esc(s.mtime)}</td>
-        <td>${s.runnable ? '<span class="tag">可运行</span>' : '<span class="tag gray">跳过</span>'}</td>
+        <td>${s.runnable ? '<span class="tag">可运行</span>' : `<span class="tag gray">${esc(s.reason || '不可运行')}</span>`}</td>
         <td class="actions"><button class="btn small" data-name="${esc(s.name)}" ${s.runnable ? "" : "disabled"} onclick="runOneScript(${projId}, this)">运行</button></td>
       </tr>`).join("") : '<tr><td colspan=6 class="empty">文件夹内没有脚本文件</td></tr>';
     panel.innerHTML = `
-      <div class="code" style="margin-bottom:8px">${esc(d.dir)}</div>
-      <div style="margin-bottom:10px"><button class="btn primary" onclick="runAllScripts(${projId})">一键运行全部</button></div>
+      <div style="margin-bottom:8px">已识别 ${d.script_count} 个脚本 · ${d.runnable_count} 个可运行 · ${d.other_count} 个配套文件</div>
+      <div style="margin-bottom:10px"><button class="btn primary" ${d.runnable_count ? '' : 'disabled'} onclick="runAllScripts(${projId})">一键运行全部</button></div>
       <table><tr><th>脚本</th><th>类型</th><th>大小</th><th>修改时间</th><th>状态</th><th>操作</th></tr>${rows}</table>
       <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
         <input id="script_cmd" placeholder="输入命令运行，如：python demo.py --case 1 或 ls -la" style="flex:1;min-width:260px">

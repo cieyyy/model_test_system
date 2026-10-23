@@ -10,12 +10,13 @@ from __future__ import annotations
 import datetime as dt
 import os
 import subprocess
-import sys
 import threading
 import uuid
+from pathlib import Path
 
 from . import runner, security
 from .db import Credential, ModelEntity, Provider, Run, SessionLocal, TestProject
+from .script_catalog import discover_scripts, script_command
 
 
 class JobManager:
@@ -94,43 +95,31 @@ class JobManager:
                 job["status"] = "error"
                 return
 
-            targets: list[tuple[str, list[str]]] = []  # (label, shell_cmd_list)
+            targets: list[tuple[str, str, list[str]]] = []
             if command.strip():
                 self._log(job, f"▶ 运行自定义命令：{command}")
-                targets.append((command.strip(), ["/bin/sh", "-c", command.strip()]))
+                targets.append((command.strip(), folder, ["/bin/sh", "-c", command.strip()]))
             else:
-                entries = sorted(
-                    e for e in os.listdir(folder)
-                    if os.path.isfile(os.path.join(folder, e)) and not e.startswith(".")
-                )
+                entries = [item for item in discover_scripts(Path(folder))["scripts"] if item["runnable"]]
                 if script_names:
                     want = set(script_names)
-                    entries = [e for e in entries if e in want]
+                    entries = [item for item in entries if item["name"] in want]
                 if not entries:
-                    self._log(job, "文件夹内没有可运行的脚本（.py/.sh/.bash 或带执行权限的文件）。", "warn")
-                    job["status"] = "finished"
+                    self._log(job, "未识别到可运行脚本。", "warn")
+                    job["status"] = "error"
                     return
-                for name in entries:
-                    ext = os.path.splitext(name)[1].lower()
-                    if ext == ".py":
-                        cmd = [sys.executable, name]
-                    elif ext in (".sh", ".bash"):
-                        cmd = ["/bin/sh", name]
-                    elif os.access(os.path.join(folder, name), os.X_OK):
-                        cmd = [os.path.join(folder, name)]
-                    else:
-                        self._log(job, f"  ℹ 跳过不可运行文件：{name}", "dim")
-                        continue
-                    targets.append((name, cmd))
+                for script in entries:
+                    working_dir, cmd = script_command(Path(folder), script)
+                    targets.append((script["name"], working_dir, cmd))
 
             overall = "finished"
-            for label, cmd in targets:
+            for label, working_dir, cmd in targets:
                 if job["cancel"].is_set():
                     self._log(job, "收到取消信号，停止后续脚本。", "warn")
                     job["status"] = "cancelled"
                     overall = "cancelled"
                     break
-                self._run_one_script(db, job, project, folder, label, cmd)
+                self._run_one_script(db, job, project, working_dir, label, cmd)
             else:
                 job["status"] = overall
         finally:
@@ -172,6 +161,7 @@ class JobManager:
                     lf.flush()
                     self._log(job, text, "info")
                 proc.wait(timeout=600)
+                proc.stdout.close()
                 exit_code = proc.returncode
                 lf.write(f"\n[退出码] {exit_code}\n")
 

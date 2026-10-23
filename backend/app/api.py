@@ -25,6 +25,7 @@ from .db import (
     TestProject,
 )
 from .jobs import manager as job_manager
+from .script_catalog import discover_scripts
 from . import runner as runner_mod
 from .schemas import (
     CredentialCreate,
@@ -770,21 +771,7 @@ def project_scripts(project_id: int, db: Session = Depends(get_db)):
     d = Path(p.script_dir).expanduser()
     if not d.is_dir():
         raise HTTPException(404, f"脚本文件夹不存在：{d}")
-    files = []
-    for entry in sorted(d.iterdir(), key=lambda e: e.name.lower()):
-        if entry.name.startswith(".") or entry.is_dir():
-            continue
-        ext = entry.suffix.lower().lstrip(".")
-        runnable = ext in {"py", "sh", "bash"} or os.access(entry, os.X_OK)
-        st = entry.stat()
-        files.append({
-            "name": entry.name,
-            "ext": ext,
-            "size": st.st_size,
-            "mtime": dt.datetime.fromtimestamp(st.st_mtime).strftime("%Y-%m-%d %H:%M"),
-            "runnable": runnable,
-        })
-    return {"dir": str(d), "scripts": files}
+    return {"dir": str(d), **discover_scripts(d)}
 
 
 @router.post("/execute-scripts")
@@ -793,6 +780,13 @@ def execute_scripts(req: ScriptExecuteRequest, db: Session = Depends(get_db)):
     p = _get_or_404(db, TestProject, req.project_id, "测试项目")
     if p.exec_mode != "script" or not p.script_dir:
         raise HTTPException(400, "该项目不是「脚本文件夹」执行模式或未设置脚本文件夹")
+    if not req.command.strip():
+        catalog = discover_scripts(Path(p.script_dir))
+        runnable = {item["name"] for item in catalog["scripts"] if item["runnable"]}
+        if req.script_names and not set(req.script_names) <= runnable:
+            raise HTTPException(400, "选中的脚本不存在或不可运行，请刷新脚本列表")
+        if not runnable:
+            raise HTTPException(400, "未识别到可运行脚本，请上传 .py、.sh 或 .bash 文件")
     job_id = job_manager.start_scripts(req.project_id, req.script_names or [], req.command)
     return {"job_id": job_id}
 

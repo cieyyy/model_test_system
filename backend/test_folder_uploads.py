@@ -10,6 +10,7 @@ import zipfile
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from app import folder_uploads
+from app.script_catalog import discover_scripts, script_command
 
 
 def archive(files):
@@ -63,6 +64,47 @@ class FolderUploadTests(unittest.TestCase):
         self.assertNotEqual(second["path"], result["path"])
         self.assertEqual(path.read_text(), "changed during execution")
         self.assertEqual((Path(second["path"]) / "main.py").read_text(), "print('original')")
+
+    def test_recognizes_nested_scripts_and_preserves_supporting_files(self):
+        result = self.upload([('root/a/test.PY', 'print("ok")'), ('root/b/test.py', 'print("ok")'),
+                              ('root/a/run.bash', 'items=(ok); echo "${items[0]}"'),
+                              ('root/a/helper', '#!/usr/bin/env python3\nprint("ok")'),
+                              ('root/a/__init__.py', ''), ('root/report.html', '<html>report</html>'),
+                              ('root/data.csv', 'a,b'), ('root/node_modules/skip.py', 'raise Exception()'),
+                              ('root/__pycache__/skip.py', 'raise Exception()')]).json()
+        self.assertEqual(result['script_count'], 5)
+        self.assertEqual(result['runnable_count'], 4)
+        self.assertEqual(result['other_count'], 2)
+        scripts = {item['name']: item for item in result['scripts']}
+        self.assertIn('b/test.py', scripts)
+        self.assertFalse(scripts['a/__init__.py']['runnable'])
+        working_dir, command = script_command(Path(result['path']), scripts['a/run.bash'])
+        self.assertEqual(Path(working_dir).name, 'a')
+        self.assertEqual(Path(command[0]).name, 'bash')
+        self.assertTrue((Path(result['path']) / 'data.csv').exists())
+
+    def test_flat_zip_upload_recognizes_files_in_multiple_roots(self):
+        response = self.client.post('/api/files/upload-folder?archive=true', content=archive([
+            ('test.py', 'print("ok")'), ('nested/test.sh', 'echo ok'), ('data.json', '{}')]))
+        self.assertEqual(response.status_code, 200, response.text)
+        result = response.json()
+        self.assertEqual(result['script_count'], 2)
+        self.assertEqual(result['other_count'], 1)
+        self.assertEqual({item['name'] for item in result['scripts']}, {'test.py', 'nested/test.sh'})
+        self.assertTrue((Path(result['path']) / 'data.json').exists())
+        self.assertEqual(self.client.post('/api/files/upload-folder?archive=true', content=archive([('../escape.py', '')])).status_code, 400)
+
+    def test_missing_interpreter_is_reported_and_symlinks_are_not_discovered(self):
+        folder = self.root / 'fixture'
+        folder.mkdir()
+        (folder / 'check.js').write_text('console.log("ok")')
+        (folder / 'data.txt').write_text('data')
+        (folder / 'link.py').symlink_to(folder / 'data.txt')
+        with patch('app.script_catalog.runtime', return_value=None):
+            result = discover_scripts(folder)
+        self.assertEqual(result['script_count'], 1)
+        self.assertEqual(result['runnable_count'], 0)
+        self.assertEqual(result['scripts'][0]['reason'], '服务器未安装 node')
 
     def test_invalid_paths_duplicates_and_multiple_roots_leave_no_files(self):
         for files in ([('/tmp/escape.py', 'x')], [('root/../escape.py', 'x')], [('root\\escape.py', 'x')],

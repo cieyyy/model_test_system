@@ -208,6 +208,36 @@ class SuiteTests(unittest.TestCase):
         self.assertEqual(job["runs"][0]["status"], "passed")
         self.assertIn("offline-folder-upload-ok", json.dumps(job["lines"]))
 
+    def test_nested_uploaded_scripts_are_discovered_and_executed(self):
+        import io
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, 'w') as bundle:
+            bundle.writestr('nested/python/check.PY', "from pathlib import Path\nprint(Path('value.txt').read_text())")
+            bundle.writestr('nested/python/value.txt', 'nested-python-ok')
+            bundle.writestr('nested/shell/check.bash', 'values=(nested-bash-ok)\necho "${values[0]}"')
+            bundle.writestr('nested/shell/check.sh', '#!/bin/bash\nvalues=(nested-shell-ok)\necho "${values[0]}"')
+            bundle.writestr('nested/report.html', '<html>support only</html>')
+        uploaded = self.client.post('/api/files/upload-folder', content=buffer.getvalue()).json()
+        self.assertEqual(uploaded['runnable_count'], 3)
+        project_id = self.client.post('/api/projects', json={'name': 'nested script fixture', 'exec_mode': 'script', 'script_dir': uploaded['path']}).json()['id']
+        result = self.client.get(f'/api/projects/{project_id}/scripts').json()
+        self.assertEqual({item['name'] for item in result['scripts']}, {'python/check.PY', 'shell/check.bash', 'shell/check.sh'})
+        for name in ('../escape.py', 'report.html', 'missing.py'):
+            self.assertEqual(self.client.post('/api/execute-scripts', json={'project_id': project_id, 'script_names': [name]}).status_code, 400)
+        job_id = self.client.post('/api/execute-scripts', json={'project_id': project_id}).json()['job_id']
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            job = self.client.get('/api/jobs/' + job_id).json()
+            if job['status'] != 'running':
+                break
+            time.sleep(.03)
+        self.assertEqual(job['status'], 'finished', job)
+        self.assertEqual(len(job['runs']), 3)
+        self.assertTrue(all(run['status'] == 'passed' for run in job['runs']), job)
+        self.assertIn('nested-python-ok', json.dumps(job['lines']))
+        self.assertIn('nested-bash-ok', json.dumps(job['lines']))
+        self.assertIn('nested-shell-ok', json.dumps(job['lines']))
+
     def test_reject_stale_preview_and_cross_provider_key(self):
         req = self.request()
         self.assertEqual(self.client.post("/api/suites/execute", json=req).status_code, 400)
