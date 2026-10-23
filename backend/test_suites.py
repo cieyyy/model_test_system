@@ -12,7 +12,7 @@ import zipfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 TEMP = tempfile.TemporaryDirectory(prefix="workbuddy-suite-test-")
 os.environ["MT_DATA_DIR"] = TEMP.name
@@ -171,6 +171,10 @@ class SuiteTests(unittest.TestCase):
             marker.touch()
             try:
                 self.assertEqual(self.client.post("/api/suites/preview", json=self.request()).status_code, 503)
+                with patch("app.web_auth.check_password", new=AsyncMock(return_value=False)):
+                    self.assertEqual(self.client.post("/auth/login", json={"username": "admin", "password": "offline-only"}).status_code, 401)
+                self.assertEqual(self.client.post("/auth/logout").status_code, 200)
+                self.assertEqual(self.client.post("/auth/logout", headers={"Origin": "https://other.test"}).status_code, 403)
                 status = self.client.get("/api/deployment-status").json()
                 self.assertEqual(status["mutating_requests"], 0)
                 self.assertEqual(self.client.get("/api/health").status_code, 200)

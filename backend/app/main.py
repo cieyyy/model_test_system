@@ -27,7 +27,7 @@ app.state.mutating_requests = 0
 @app.middleware("http")
 async def maintenance_guard(request: Request, call_next):
     marker = os.environ.get("MT_MAINTENANCE_FILE")
-    if marker and request.method not in ("GET", "HEAD", "OPTIONS"):
+    if marker and request.method not in ("GET", "HEAD", "OPTIONS") and request.url.path not in ("/auth/login", "/auth/logout"):
         if Path(marker).exists():
             return JSONResponse({"detail": "平台正在更新，请稍后重试"}, status_code=503)
     mutating = request.method not in ("GET", "HEAD", "OPTIONS")
