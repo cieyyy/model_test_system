@@ -99,7 +99,7 @@
   }
 </style>
 <link rel="stylesheet" href="/static/workspace.css?v=20261022-four-sections">
-<link rel="stylesheet" href="/static/studio.css?v=20261023-gold-console">
+<link rel="stylesheet" href="/static/studio.css?v=20261023-project-layout">
 </head>
 <body>
 <aside id="platformSidebar">
@@ -471,21 +471,21 @@ function renderProjects() {
   $("#main").innerHTML = `
     <h2>测试项目</h2>
     <div class="card">
-      <form class="row" onsubmit="return createProject(event)">
+      <form class="row project-create-form" onsubmit="return createProject(event)">
         <div class="field"><label>项目名称 *</label><input id="j_name" required placeholder="如 流式输出兼容性"></div>
         <div class="field"><label>分类（可自定义输入）</label><input id="j_cat" list="cat_list" value="通用">
           <datalist id="cat_list"><option>通用</option><option>chat</option><option>stream</option><option>json</option>
           <option>tools</option><option>vision</option><option>context</option><option>并发压测</option><option>模型专项</option></datalist></div>
         <div class="field"><label>中转站</label><select id="j_provider">${providerOpts}</select></div>
         <div class="field"><label>模型</label><select id="j_model">${modelOpts}</select></div>
-        <div class="field"><label>执行模式</label><select id="j_exec_mode" onchange="toggleExecMode('j')">
+        <div class="field project-exec-field"><label>执行模式</label><select id="j_exec_mode" onchange="toggleExecMode('j')">
           <option value="builtin">标准测试（chat/stream/json/tools）</option>
           <option value="script">上传测试脚本</option></select></div>
-        <div class="field" id="j_script_dir_wrap" style="display:none"><label>测试脚本</label>
-          <input id="j_script_dir" type="hidden"><div style="display:flex;gap:8px;flex-wrap:wrap"><input id="j_script_dir_label" style="flex:1;min-width:120px" readonly placeholder="选择文件、ZIP 或文件夹">
-          <button class="btn small" type="button" onclick="openFolderPickerFor('j_script_dir',true)">选文件</button><button class="btn small" type="button" onclick="openFolderPickerFor('j_script_dir')">选文件夹</button></div><div id="j_script_dir_analysis" class="hint" style="overflow-wrap:anywhere;margin-top:8px"></div></div>
-        <div class="field"><label>自定义命令</label><input id="j_cmd" placeholder="脚本模式下可填一次性命令（留空则跑文件夹内脚本）"></div>
-        <button class="btn primary">登记项目</button>
+        <div class="field project-script-field" id="j_script_dir_wrap" style="display:none"><label>测试脚本</label>
+          <input id="j_script_dir" type="hidden"><div class="project-script-picker"><input id="j_script_dir_label" readonly placeholder="选择文件、ZIP 或文件夹">
+          <button class="btn small" type="button" onclick="openFolderPickerFor('j_script_dir',true)">选文件</button><button class="btn small" type="button" onclick="openFolderPickerFor('j_script_dir')">选文件夹</button></div><div id="j_script_dir_analysis" class="hint project-script-analysis"></div></div>
+        <div class="field project-command-field"><label>自定义命令</label><input id="j_cmd" placeholder="脚本模式下可填一次性命令（留空则跑文件夹内脚本）"></div>
+        <button class="btn primary project-submit">登记项目</button>
       </form>
     </div>
     ${state.projects.length ? `<table><tr><th>名称</th><th>分类</th><th>中转站</th><th>模型</th><th>脚本</th><th>资产</th><th>状态</th><th>操作</th></tr>${rows}</table>` : '<div class="card empty">还没有登记测试项目</div>'}`;
@@ -512,6 +512,7 @@ function toggleExecMode(prefix) {
   const mode = document.getElementById(prefix + "_exec_mode").value;
   const wrap = document.getElementById(prefix + "_script_dir_wrap");
   if (wrap) wrap.style.display = mode === "script" ? "" : "none";
+  if (prefix === 'j') wrap?.closest('form')?.classList.toggle('project-script-mode', mode === 'script');
 }
 window.toggleExecMode = toggleExecMode;
 function editProject(id) {
@@ -530,8 +531,8 @@ function editProject(id) {
       <option value="builtin" ${p.exec_mode !== "script" ? "selected" : ""}>标准测试（chat/stream/json/tools）</option>
       <option value="script" ${p.exec_mode === "script" ? "selected" : ""}>上传测试脚本</option></select></div>
     <div class="field" style="margin-bottom:10px" id="ej_script_dir_wrap"><label>测试脚本</label>
-      <input id="ej_script_dir" type="hidden" value="${esc(p.script_dir)}"><div style="display:flex;gap:8px;flex-wrap:wrap"><input id="ej_script_dir_label" value="${esc(p.script_dir.split(/[\\/]/).filter(Boolean).pop() || '')}" style="flex:1;min-width:120px" readonly placeholder="选择文件、ZIP 或文件夹">
-      <button class="btn small" type="button" onclick="openFolderPickerFor('ej_script_dir',true)">选文件</button><button class="btn small" type="button" onclick="openFolderPickerFor('ej_script_dir')">选文件夹</button></div><div id="ej_script_dir_analysis" class="hint" style="overflow-wrap:anywhere;margin-top:8px"></div></div>
+      <input id="ej_script_dir" type="hidden" value="${esc(p.script_dir)}"><div class="project-script-picker"><input id="ej_script_dir_label" value="${esc(p.script_dir.split(/[\\/]/).filter(Boolean).pop() || '')}" readonly placeholder="选择文件、ZIP 或文件夹">
+      <button class="btn small" type="button" onclick="openFolderPickerFor('ej_script_dir',true)">选文件</button><button class="btn small" type="button" onclick="openFolderPickerFor('ej_script_dir')">选文件夹</button></div><div id="ej_script_dir_analysis" class="hint project-script-analysis"></div></div>
     <div class="field" style="margin-bottom:10px"><label>自定义命令</label><input id="ej_cmd" value="${esc(p.command)}" style="width:100%"></div>
     <div class="hint">来源：${esc(p.source === "imported" ? "旧资料导入" : "手动登记")} · 资产文件 ${p.asset_count} 个（只读引用）。导入的项目编辑分类并启用后即可执行。</div>
     <div class="foot"><button class="btn" onclick="closeModal()">取消</button>
