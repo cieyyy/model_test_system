@@ -2,6 +2,8 @@
 
 整合本机模型测试脚本、流式并发曲线、测试记录、在线编辑报告和不同中转站的模型对比。侧栏只有新建测试、数据展示、测试记录、模型对比四个入口。测试支持单个项目或所有项目，真实请求需要先预览计划并确认。
 
+测试项目的「浏览」选择访问者电脑上的文件夹。登记或保存项目时上传，保留子目录和相对路径，之后在服务器运行脚本；编辑项目可重新选择文件夹替换引用。旧资料导入也支持选择电脑文件夹上传并扫描。每次最多 2000 个文件、合计 100 MB、单文件 32 MB，自动跳过 .git、虚拟环境、node_modules 和 Python 缓存。服务器按文件内容复用未改动的相同文件夹，不保留中间压缩包，上传数据位于 data/script_uploads 并随现有数据备份。
+
 ## Docker 部署
 
 所有常驻服务统一使用 Docker Compose：
@@ -78,7 +80,7 @@ model-test-ctl up -d --force-recreate proxy
 更新时自动在临时容器中运行下列离线测试，不挂载生产数据库和凭据、不消耗模型额度：
 
 ```bash
-python -m unittest -q test_suites test_web_auth
+python -m unittest -q test_suites test_web_auth test_folder_uploads
 # 工作目录切换到 /app/test-scripts/llm-benchmark 后：
 python -m unittest discover -q -s tests
 ```

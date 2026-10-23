@@ -19,6 +19,7 @@ from .suite_reports import router as report_router
 from .suite_jobs import manager as suite_manager, recover_interrupted
 from .jobs import manager as legacy_manager
 from .web_auth import router as auth_router
+from .folder_uploads import router as folder_router
 
 app = FastAPI(title="模型测试平台", version="0.2.0")
 app.state.mutating_requests = 0
@@ -53,6 +54,7 @@ def deployment_status():
 
 app.include_router(router)
 app.include_router(auth_router)
+app.include_router(folder_router)
 app.include_router(import_router)
 app.include_router(suite_router)
 app.include_router(report_router)

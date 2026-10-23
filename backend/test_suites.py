@@ -183,6 +183,31 @@ class SuiteTests(unittest.TestCase):
             self.assertEqual(self.client.post("/api/suites/preview", json=self.request(), headers={"Origin": "https://other.test"}).status_code, 403)
             self.assertEqual(self.client.post("/api/suites/preview", json=self.request(), headers={"Origin": "https://example.test"}).status_code, 200)
 
+    def test_uploaded_folder_runs_with_relative_fixture_paths(self):
+        import io
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w") as bundle:
+            bundle.writestr("client-folder/main.py", "from pathlib import Path\nprint(Path('fixtures/value.txt').read_text())\n")
+            bundle.writestr("client-folder/fixtures/value.txt", "offline-folder-upload-ok")
+        uploaded = self.client.post("/api/files/upload-folder", content=buffer.getvalue())
+        self.assertEqual(uploaded.status_code, 200, uploaded.text)
+        project = self.client.post("/api/projects", json={"name": "uploaded folder fixture", "exec_mode": "script", "script_dir": uploaded.json()["path"]})
+        self.assertEqual(project.status_code, 201, project.text)
+        project_id = project.json()["id"]
+        scripts = self.client.get(f"/api/projects/{project_id}/scripts").json()["scripts"]
+        self.assertEqual([item["name"] for item in scripts], ["main.py"])
+        result = self.client.post("/api/execute-scripts", json={"project_id": project_id, "script_names": ["main.py"]})
+        self.assertEqual(result.status_code, 200, result.text)
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            job = self.client.get("/api/jobs/" + result.json()["job_id"]).json()
+            if job["status"] != "running":
+                break
+            time.sleep(.03)
+        self.assertEqual(job["status"], "finished", job)
+        self.assertEqual(job["runs"][0]["status"], "passed")
+        self.assertIn("offline-folder-upload-ok", json.dumps(job["lines"]))
+
     def test_reject_stale_preview_and_cross_provider_key(self):
         req = self.request()
         self.assertEqual(self.client.post("/api/suites/execute", json=req).status_code, 400)

@@ -120,6 +120,8 @@
 <div class="toast" id="toast"></div>
 
 <script src="/static/vendor/lucide.min.js"></script>
+<script src="/static/vendor/fflate.min.js?v=0.8.2"></script>
+<script src="/static/folder-upload.js?v=20261023-local-folder"></script>
 <script src="/static/studio.js?v=20261023-browser-login"></script>
 <script src="/static/suites.js?v=20261020-report-toggle"></script>
 <script src="/static/reports.js?v=20261020-report-grouping"></script>
@@ -447,6 +449,7 @@ window.saveModel = saveModel;
 
 /* ---------------- 测试项目 ---------------- */
 function renderProjects() {
+  localFolders.delete('j_script_dir');
   const providerOpts = `<option value="">— 无 —</option>` + state.providers.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join("");
   const modelOpts = `<option value="">— 无 —</option>` + state.models.map(m => `<option value="${m.id}">${esc(m.model_name)}</option>`).join("");
   const rows = state.projects.map(p => `
@@ -455,7 +458,7 @@ function renderProjects() {
       <td><span class="tag ${p.source === "imported" ? "gray" : ""}">${esc(p.category)}</span></td>
       <td>${esc(p.provider_name) || "—"}</td>
       <td>${esc(p.model_name) || "—"}</td>
-      <td class="code">${p.exec_mode === "script" ? (esc(p.script_dir) || "—") : (esc(p.script_path) || "—")}</td>
+      <td class="code">${p.exec_mode === "script" ? (esc(p.script_dir.split(/[\\/]/).filter(Boolean).pop()) || "—") : (esc(p.script_path) || "—")}</td>
       <td>${p.asset_count || "—"}</td>
       <td>${p.enabled ? '<span class="tag">启用</span>' : '<span class="tag warn">未启用</span>'}</td>
       <td class="actions">
@@ -467,7 +470,6 @@ function renderProjects() {
     </tr>`).join("");
   $("#main").innerHTML = `
     <h2>测试项目</h2>
-    <div class="hint">测试项目有三个来源：<b>① 手动登记</b>——完全自定义；<b>② 旧资料导入</b>——自动生成、默认停用，可再编辑；<b>③ 执行时自动构造标准请求</b>——分类为 chat / stream / json / tools 的项目，执行时平台自动生成对应的标准测试请求。<b>执行模式</b>可选「标准测试」或「脚本文件夹」：选脚本文件夹后填写本地脚本目录，执行时会在这个目录里逐文件运行（.py 用当前 Python、.sh/.bash 用 sh），也可在终端里直接输入命令运行；输出实时进入终端并落证据。</div>
     <div class="card">
       <form class="row" onsubmit="return createProject(event)">
         <div class="field"><label>项目名称 *</label><input id="j_name" required placeholder="如 流式输出兼容性"></div>
@@ -478,9 +480,9 @@ function renderProjects() {
         <div class="field"><label>模型</label><select id="j_model">${modelOpts}</select></div>
         <div class="field"><label>执行模式</label><select id="j_exec_mode" onchange="toggleExecMode('j')">
           <option value="builtin">标准测试（chat/stream/json/tools）</option>
-          <option value="script">脚本文件夹（在本服务器终端运行）</option></select></div>
+          <option value="script">上传脚本文件夹</option></select></div>
         <div class="field" id="j_script_dir_wrap" style="display:none"><label>脚本文件夹</label>
-          <div style="display:flex;gap:8px"><input id="j_script_dir" style="flex:1" placeholder="/path/to/scripts（只记录路径，不复制）">
+          <input id="j_script_dir" type="hidden"><div style="display:flex;gap:8px"><input id="j_script_dir_label" style="flex:1;min-width:0" readonly placeholder="选择电脑上的脚本文件夹">
           <button class="btn small" type="button" onclick="openFolderPickerFor('j_script_dir')">浏览…</button></div></div>
         <div class="field"><label>自定义命令</label><input id="j_cmd" placeholder="脚本模式下可填一次性命令（留空则跑文件夹内脚本）"></div>
         <button class="btn primary">登记项目</button>
@@ -490,7 +492,10 @@ function renderProjects() {
 }
 async function createProject(e) {
   e.preventDefault();
+  const button = e.submitter;
+  if (button) button.disabled = true;
   try {
+    if ($('#j_exec_mode').value === 'script' && !await uploadSelectedFolder('j_script_dir')) throw new Error('请选择电脑上的脚本文件夹');
     await api("/projects", { method: "POST", body: JSON.stringify({
       name: $("#j_name").value.trim(), category: $("#j_cat").value.trim() || "通用",
       provider_id: +$("#j_provider").value || null, model_id: +$("#j_model").value || null,
@@ -499,6 +504,7 @@ async function createProject(e) {
     })});
     toast("已登记"); render();
   } catch (err) { toast(err.message); }
+  finally { if (button) button.disabled = false; }
   return false;
 }
 window.createProject = createProject;
@@ -509,6 +515,7 @@ function toggleExecMode(prefix) {
 }
 window.toggleExecMode = toggleExecMode;
 function editProject(id) {
+  localFolders.delete('ej_script_dir');
   const p = state.projects.find(x => x.id === id);
   const providerOpts = `<option value="">— 无 —</option>` + state.providers.map(pr => `<option value="${pr.id}" ${pr.id === p.provider_id ? "selected" : ""}>${esc(pr.name)}</option>`).join("");
   const modelOpts = `<option value="">— 无 —</option>` + state.models.map(m => `<option value="${m.id}" ${m.id === p.model_id ? "selected" : ""}>${esc(m.model_name)}</option>`).join("");
@@ -521,19 +528,22 @@ function editProject(id) {
     <div class="field" style="margin-bottom:10px"><label>模型</label><select id="ej_model" style="width:100%">${modelOpts}</select></div>
     <div class="field" style="margin-bottom:10px"><label>执行模式</label><select id="ej_exec_mode" style="width:100%" onchange="toggleExecMode('ej')">
       <option value="builtin" ${p.exec_mode !== "script" ? "selected" : ""}>标准测试（chat/stream/json/tools）</option>
-      <option value="script" ${p.exec_mode === "script" ? "selected" : ""}>脚本文件夹（在本服务器终端运行）</option></select></div>
+      <option value="script" ${p.exec_mode === "script" ? "selected" : ""}>上传脚本文件夹</option></select></div>
     <div class="field" style="margin-bottom:10px" id="ej_script_dir_wrap"><label>脚本文件夹</label>
-      <div style="display:flex;gap:8px"><input id="ej_script_dir" value="${esc(p.script_dir)}" style="flex:1">
+      <input id="ej_script_dir" type="hidden" value="${esc(p.script_dir)}"><div style="display:flex;gap:8px"><input id="ej_script_dir_label" value="${esc(p.script_dir.split(/[\\/]/).filter(Boolean).pop() || '')}" style="flex:1;min-width:0" readonly placeholder="选择电脑上的脚本文件夹">
       <button class="btn small" type="button" onclick="openFolderPickerFor('ej_script_dir')">浏览…</button></div></div>
     <div class="field" style="margin-bottom:10px"><label>自定义命令</label><input id="ej_cmd" value="${esc(p.command)}" style="width:100%"></div>
     <div class="hint">来源：${esc(p.source === "imported" ? "旧资料导入" : "手动登记")} · 资产文件 ${p.asset_count} 个（只读引用）。导入的项目编辑分类并启用后即可执行。</div>
     <div class="foot"><button class="btn" onclick="closeModal()">取消</button>
-    <button class="btn primary" onclick="saveProject(${id})">保存修改</button></div>`);
+    <button class="btn primary" id="ej_save" onclick="saveProject(${id})">保存修改</button></div>`);
   toggleExecMode('ej');
 }
 window.editProject = editProject;
 async function saveProject(id) {
+  const button = $('#ej_save');
+  if (button) button.disabled = true;
   try {
+    if ($('#ej_exec_mode').value === 'script' && !await uploadSelectedFolder('ej_script_dir')) throw new Error('请选择电脑上的脚本文件夹');
     await api(`/projects/${id}`, { method: "PUT", body: JSON.stringify({
       name: $("#ej_name").value.trim(), category: $("#ej_cat").value.trim() || "通用",
       provider_id: +$("#ej_provider").value || null, model_id: +$("#ej_model").value || null,
@@ -542,6 +552,7 @@ async function saveProject(id) {
     })});
     closeModal(); toast("已保存修改"); render();
   } catch (err) { toast(err.message); }
+  finally { if (button) button.disabled = false; }
 }
 window.saveProject = saveProject;
 async function toggleProject(id, enabled) {
@@ -989,11 +1000,10 @@ async function renderImport() {
       </form>
       <div class="hint" style="margin:12px 0 0">支持 HTML 报告、CSV / TSV、Excel（XLSX）和 JSON。文件会上传到服务器，按内容哈希去重，并将识别结果加入「模型对比」。</div>
     </div>
-    <div class="hint">扫描服务器已有资料目录（<span class="code">${esc(scan.root)}</span>）并登记为测试项目。原目录文件不移动、不修改。</div>
     <div class="card">
       <form class="row" onsubmit="return doImport(event)">
         <div class="field" style="flex:1;min-width:0"><label>旧资料根目录</label><input id="i_root" style="width:100%;min-width:0" value="${esc(scan.root)}"></div>
-        <button class="btn" type="button" onclick="openFolderPicker()">浏览…</button>
+        <button class="btn" type="button" onclick="openFolderPicker()">选择电脑文件夹…</button>
         <button class="btn" type="button" onclick="renderImport()">重新扫描</button>
         <button class="btn primary">导入勾选项</button>
       </form>
@@ -1093,56 +1103,6 @@ async function doImport(e) {
   return false;
 }
 window.doImport = doImport;
-
-/* 文件夹选择器：浏览本机目录，选择后回填到指定输入框 */
-let pickerPath = "";
-window._pickerTarget = null;  // 非空时回填到该 input id（否则回填导入根目录）
-function openFolderPicker() {
-  window._pickerTarget = null;
-  pickerPath = ($("#i_root") ? $("#i_root").value.trim() : "");
-  renderPicker();
-}
-function openFolderPickerFor(inputId) {
-  window._pickerTarget = inputId;
-  const el = document.getElementById(inputId);
-  pickerPath = el ? el.value.trim() : "";
-  renderPicker();
-}
-window.openFolderPicker = openFolderPicker;
-window.openFolderPickerFor = openFolderPickerFor;
-async function renderPicker() {
-  try {
-    const p = await api(`/fs/browse?path=${encodeURIComponent(pickerPath)}`);
-    pickerPath = p.path;
-    window._pkDirs = p.dirs;
-    window._pkParent = p.parent;
-    const rows = (p.parent ? `<tr><td><button class="btn small" onclick="pickerGo(window._pkParent)">↩ 上级目录</button></td></tr>` : "") +
-      p.dirs.map((d, i) => `<tr><td><button class="btn small" onclick="pickerEnter(${i})">📁 ${esc(d)}</button></td></tr>`).join("");
-    openModal(`<h3>选择文件夹</h3>
-      <div class="code" style="margin-bottom:10px">${esc(p.path)}</div>
-      <div style="max-height:320px;overflow:auto;border:1px solid var(--border);border-radius:8px">
-      <table><tr><th>子目录（点击进入）</th></tr>${rows || '<tr><td class="empty">无子目录</td></tr>'}</table></div>
-      <div class="foot"><button class="btn" onclick="closeModal()">取消</button>
-      <button class="btn primary" onclick="pickerSelect()">选择当前目录</button></div>`);
-  } catch (err) { toast(err.message); }
-}
-async function pickerGo(path) { pickerPath = path; await renderPicker(); }
-function pickerEnter(i) { pickerGo(pickerPath.replace(/\/$/, "") + "/" + window._pkDirs[i]); }
-function pickerSelect() {
-  if (window._pickerTarget) {
-    const input = document.getElementById(window._pickerTarget);
-    if (input) input.value = pickerPath;
-    window._pickerTarget = null;
-    closeModal();
-    return;
-  }
-  const input = $("#i_root");
-  if (input) input.value = pickerPath;
-  closeModal(); toast("已选择目录，正在重新扫描…"); renderImport();
-}
-window.pickerGo = pickerGo;
-window.pickerEnter = pickerEnter;
-window.pickerSelect = pickerSelect;
 
 /* ---------------- 设置 ---------------- */
 function renderSettings() {
