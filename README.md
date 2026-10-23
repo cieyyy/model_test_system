@@ -21,6 +21,8 @@ bash /opt/model-test/repository/deploy/install.sh YOUR_SERVER_IP
 
 安装程序配置 Docker、持久目录、认证和 IP 证书，并构建、测试和启动三个容器。初始登录信息仅保存在服务器 `/root/model-test-login.txt`。已有其他站点的服务器需要先合并入口配置，不能直接使用独占端口安装。
 
+网页登录使用 `/login` 页面，兼容内置浏览器，不再依赖浏览器的 Basic Auth 弹窗。账号密码仍由原有 htpasswd 文件验证；登录后使用有效期 8 小时的加密、HttpOnly、Secure Cookie，页面右上角可退出登录。会话不建立额外数据库或缓存服务。API 和部署检查继续支持原有 Basic 认证，未登录时业务接口和文件仍不可访问。8080 密码校验入口仅存在于 Docker 内网，不映射宿主机。
+
 旧 systemd 部署也执行同一安装命令：构建和离线测试期间旧站点持续运行；切换前检查没有活动任务、阻止新写入、备份数据，然后停止旧服务并启用容器。保留原数据路径、secret.key、登录信息和 HTTPS 证书，不导出再导入数据库。启动或 HTTPS 检查失败时自动恢复旧服务与本次切换前的数据。
 
 ## 持久化与磁盘控制
@@ -76,7 +78,7 @@ model-test-ctl up -d --force-recreate proxy
 更新时自动在临时容器中运行下列离线测试，不挂载生产数据库和凭据、不消耗模型额度：
 
 ```bash
-python -m unittest -q test_suites
+python -m unittest -q test_suites test_web_auth
 # 工作目录切换到 /app/test-scripts/llm-benchmark 后：
 python -m unittest discover -q -s tests
 ```

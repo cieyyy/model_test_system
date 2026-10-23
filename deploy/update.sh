@@ -38,13 +38,14 @@ printf 'MT_VERSION=%s\nAPP_UID=%s\nAPP_GID=%s\n' "$revision" \
 compose() { docker compose --env-file "$runtime" -f "$release/compose.yaml" "$@"; }
 compose config --quiet
 compose pull --quiet proxy certbot
+compose run --rm --no-deps --entrypoint nginx proxy -t
 compose build app
 image=local/model-test:$revision
 # No production database or credentials are mounted in the offline test runner.
 docker run --rm --entrypoint /bin/sh --tmpfs /tmp:rw,size=256m,mode=1777 \
     -e MT_RESULT_ROOT=/tmp/results -e TIKTOKEN_CACHE_DIR=/tmp/tiktoken \
     -v /var/lib/model-test/acceptance-fixtures:/app/test-scripts/standalone-acceptance/fixtures:ro \
-    "$image" -ec 'python -m unittest -q test_suites; cd /app/test-scripts/llm-benchmark; python -m unittest discover -q -s tests; test -r /app/docs/models/模版.html; test -r /app/docs/models/测试结果模板.xlsx'
+    "$image" -ec 'python -m unittest -q test_suites test_web_auth; cd /app/test-scripts/llm-benchmark; python -m unittest discover -q -s tests; test -r /app/docs/models/模版.html; test -r /app/docs/models/测试结果模板.xlsx'
 
 marker=$config/maintenance
 backup=/var/backups/model-test/$(date -u +%Y%m%dT%H%M%SZ)-${revision:0:8}
@@ -127,17 +128,32 @@ ln -sfn "$release" "$base/current"
 switched=1
 compose up -d --wait --wait-timeout 180 --remove-orphans
 curl -fsS http://127.0.0.1:8032/api/health >/dev/null
-# Also exercise TLS, the reverse proxy, and Basic Auth without logging credentials.
+# Exercise TLS, browser sessions, and Basic checks without logging credentials.
 python3 - <<'PY'
-import base64, os, urllib.request
+import base64, http.cookiejar, json, urllib.error, urllib.request
 from pathlib import Path
 env = dict(line.split("=",1) for line in Path("/etc/model-test/platform.env").read_text().splitlines() if "=" in line and not line.startswith("#"))
 login = dict(line.split(": ",1) for line in Path("/root/model-test-login.txt").read_text().splitlines() if ": " in line)
-url = env["MT_PUBLIC_URL"].rstrip("/") + "/api/health"
+base_url = env["MT_PUBLIC_URL"].rstrip("/")
+url = base_url + "/api/health"
 token = base64.b64encode((login["Username"]+":"+login["Password"]).encode()).decode()
 req = urllib.request.Request(url, headers={"Authorization":"Basic "+token})
 with urllib.request.urlopen(req, timeout=15) as r:
     assert r.status == 200
+try:
+    urllib.request.urlopen(url, timeout=15)
+except urllib.error.HTTPError as error:
+    assert error.code == 401 and "WWW-Authenticate" not in error.headers
+else:
+    raise AssertionError("Unauthenticated API access was accepted")
+with urllib.request.urlopen(base_url + "/", timeout=15) as response:
+    assert response.status == 200 and "/login" in response.url
+browser = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+request = urllib.request.Request(base_url + "/auth/login", data=json.dumps({"username": login["Username"], "password": login["Password"]}).encode(), headers={"Content-Type": "application/json", "Origin": base_url})
+with browser.open(request, timeout=15) as response:
+    assert response.status == 200 and "HttpOnly" in response.headers.get("Set-Cookie", "")
+with browser.open(url, timeout=15) as response:
+    assert response.status == 200
 PY
 if [[ $legacy == 1 && -n $previous ]]; then
     systemctl disable model-test nginx model-test-certbot.timer

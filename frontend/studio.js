@@ -4,12 +4,20 @@ function studioSendTheme(frame) {
   frame.contentWindow?.postMessage({type:'benchmark:theme', theme:studioTheme()}, '*');
 }
 function studioRefreshTheme() {
+  document.getElementById('sessionLogout').style.display=location.protocol==='https:'?'':'none';
   const light=studioTheme()==='light';
   const button=document.getElementById('themeToggle');
   button.title=button.ariaLabel=light?'切换到深色':'切换到浅色';
   button.innerHTML=`<i data-lucide="${light?'moon':'sun'}" aria-hidden="true"></i>`;
   document.querySelectorAll('iframe[data-benchmark-frame]').forEach(studioSendTheme);
   studioDecorate();
+}
+async function studioLogout() {
+  try {
+    const response=await fetch('/auth/logout',{method:'POST'});
+    if(!response.ok)throw new Error();
+    location.replace('/login');
+  } catch { toast('退出登录失败，请重试'); }
 }
 function studioToggleTheme() {
   document.documentElement.dataset.theme=studioTheme()==='dark'?'light':'dark';

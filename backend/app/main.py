@@ -18,6 +18,7 @@ from .suite_api import router as suite_router
 from .suite_reports import router as report_router
 from .suite_jobs import manager as suite_manager, recover_interrupted
 from .jobs import manager as legacy_manager
+from .web_auth import router as auth_router
 
 app = FastAPI(title="模型测试平台", version="0.2.0")
 app.state.mutating_requests = 0
@@ -51,6 +52,7 @@ def deployment_status():
     return dict(mutating_requests=app.state.mutating_requests, active_jobs=suites + legacy)
 
 app.include_router(router)
+app.include_router(auth_router)
 app.include_router(import_router)
 app.include_router(suite_router)
 app.include_router(report_router)
