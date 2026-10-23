@@ -1,14 +1,14 @@
 :root {
   color-scheme:dark;
-  --paper:#141513; --panel:#1a1c19; --ink:#efefe9; --line:#31352e;
-  --muted:#92988c; --green:#9ac9ad; --gold:#e3c779; --control:#20231f;
-  --chart-grid:#353b31; --chart-label:#9da695;
+  --paper:#080b10; --panel:#0e1319; --ink:#e6e8eb; --line:#252b33;
+  --muted:#8a929e; --green:#79c5a5; --gold:#d4aa59; --control:#171d25;
+  --chart-grid:#252b33; --chart-label:#8a929e;
 }
 :root[data-theme=light] {
   color-scheme:light;
-  --paper:#f6f7f4; --panel:#fff; --ink:#22291f; --line:#dce0d6;
-  --muted:#737d6c; --green:#23634a; --gold:#826b28; --control:#e9ede3;
-  --chart-grid:#dce0d6; --chart-label:#737d6c;
+  --paper:#f5f6f8; --panel:#fff; --ink:#20262e; --line:#e0e4e9;
+  --muted:#6c7785; --green:#256d52; --gold:#8a641e; --control:#f0f2f5;
+  --chart-grid:#e0e4e9; --chart-label:#6c7785;
 }
 html,body.offline,.offline main { background:var(--paper); color:var(--ink); }
 * { letter-spacing:0; }

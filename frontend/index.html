@@ -99,13 +99,13 @@
   }
 </style>
 <link rel="stylesheet" href="/static/workspace.css?v=20261022-four-sections">
-<link rel="stylesheet" href="/static/studio.css?v=20261022-four-sections">
+<link rel="stylesheet" href="/static/studio.css?v=20261023-gold-console">
 </head>
 <body>
 <aside id="platformSidebar">
   <a class="workspace-brand" href="#dashboard" onclick="event.preventDefault();go('dashboard')"><span class="workspace-mark"><i data-lucide="aperture" aria-hidden="true"></i></span><span>模型测试<small>MODEL TESTING</small></span></a>
   <nav id="nav" aria-label="工作区导航"></nav>
-  <div class="workspace-sidebar-footer"><i data-lucide="layers-2" aria-hidden="true"></i> 测试工作空间 <span>01</span></div>
+  <div class="workspace-sidebar-footer"><i data-lucide="layers-2" aria-hidden="true"></i> 模型测试工作空间</div>
 </aside>
 <div id="platformWorkspace">
 <header>
@@ -120,10 +120,10 @@
 <div class="toast" id="toast"></div>
 
 <script src="/static/vendor/lucide.min.js"></script>
-<script src="/static/studio.js?v=20261022-four-sections"></script>
+<script src="/static/studio.js?v=20261023-gold-console"></script>
 <script src="/static/suites.js?v=20261020-report-toggle"></script>
 <script src="/static/reports.js?v=20261020-report-grouping"></script>
-<script src="/static/workspace.js?v=20261016-reports"></script>
+<script src="/static/workspace.js?v=20261023-gold-console"></script>
 <script>
 const API = "/api";
 let state = { tab: location.hash.slice(1) || "dashboard", providers: [], models: [], projects: [], stats: {}, legacyRoot: "" };
@@ -160,7 +160,7 @@ const SECTION_VIEWS = {
 function renderNav() {
   const section = Object.keys(SECTION_VIEWS).find(key => SECTION_VIEWS[key].some(([view]) => view === state.tab)) || 'dashboard';
   const icons={suites:'plus',dashboard:'activity',history:'history',matrix:'grid-2x2'};
-  $('#nav').innerHTML = TABS.map(([key,label]) => `<button type="button" data-section="${key}" class="${section===key?'active':''}" onclick="go('${key}')" ${section===key?'aria-current="page"':''}><i data-lucide="${icons[key]}" aria-hidden="true"></i><span>${label}</span></button>`).join('');
+  $('#nav').innerHTML = TABS.map(([key,label]) => `<button type="button" data-section="${key}" class="${section===key?'active':''}" onclick="go('${key}')" ${section===key?'aria-current="page"':''}><span class="workspace-nav-icon"><i data-lucide="${icons[key]}" aria-hidden="true"></i></span><span>${label}</span></button>`).join('');
   const sectionLabel=TABS.find(([key])=>key===section)[1];
   $('#workspaceLocation').textContent=sectionLabel;
   $('#workspaceSectionNav').setAttribute('aria-label',sectionLabel+'功能');

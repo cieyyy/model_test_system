@@ -117,6 +117,8 @@ async function renderDashboard() {
   const runs = await workspaceBenchmarkRuns();
   if (state.tab !== 'dashboard' || generation !== workspaceGeneration) return;
   if (!runs.length) {
+    $('#workspaceStage').innerHTML = '<option value="">暂无测试记录</option>';
+    $('#workspaceStage').disabled = true;
     $('#workspaceReport').innerHTML = '<div class="empty">尚无压测记录</div>';
     return;
   }

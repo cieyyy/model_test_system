@@ -17,10 +17,8 @@ function studioToggleTheme() {
   studioRefreshTheme();
 }
 function studioHeading(view) {
-  const pages={dashboard:['02','PERFORMANCE','数据展示'],history:['03','TEST HISTORY','测试记录'],suites:['01','MODEL TEST','新建测试'],reports:['03','TEST REPORTS','测试报告']};
-  const [index,label,title]=pages[view];
-  const date=new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
-  return `<div class="studio-page-heading"><div><div class="studio-eyebrow"><span>${index}</span>${label}</div><h2>${title}<span class="studio-title-dot" aria-hidden="true">.</span></h2></div><div class="studio-date">${date}<span>MODEL TEST WORKSPACE</span></div></div>`;
+  const titles={dashboard:'数据展示',history:'测试记录',suites:'新建测试',reports:'测试报告'};
+  return `<div class="studio-page-heading"><h2>${titles[view]}</h2></div>`;
 }
 const studioCommandIcons={
   '新建测试':'plus','一键测试全部项目':'list-checks','预览计划':'scan-line','执行计划':'play','运行本地模拟':'play',
@@ -28,6 +26,27 @@ const studioCommandIcons={
   '新增行':'plus','查看报告':'eye','收起':'chevron-up','收起报告':'chevron-up','恢复本机默认值':'rotate-ccw','HTML':'file-code-2','Excel / CSV':'sheet','JSON':'braces',
 };
 function studioDecorate() {
+  document.querySelectorAll('div.empty:not([data-studio-empty])').forEach(empty=>{
+    if(empty.closest('td,th'))return;
+    empty.dataset.studioEmpty='true';
+    empty.classList.add('studio-empty');
+    const text=document.createElement('p');
+    text.append(...empty.childNodes);
+    const icon=document.createElement('span');
+    icon.className='studio-empty-icon';
+    const view=typeof state==='undefined'?'':state.tab;
+    const symbol=({dashboard:'chart-no-axes-combined',matrix:'git-compare-arrows',reports:'file-chart-column',history:'history'})[view]||'inbox';
+    icon.innerHTML=`<i data-lucide="${symbol}" aria-hidden="true"></i>`;
+    empty.append(icon,text);
+    if(empty.parentElement?.id==='workspaceReport'||(empty.parentElement?.id==='historyRecords'&&!workspaceHistoryRuns.length)) {
+      const button=document.createElement('button');
+      button.className='btn primary';
+      button.type='button';
+      button.textContent='新建测试';
+      button.onclick=()=>go('suites');
+      empty.append(button);
+    }
+  });
   document.querySelectorAll('.suite-config-icon:not([data-studio-icon])').forEach(button=>{
     const icon=button.title.startsWith('配置 ')?'sliders-horizontal':({'恢复原始行':'rotate-ccw','上移':'arrow-up','下移':'arrow-down'}[button.title]);
     if(!icon)return;
